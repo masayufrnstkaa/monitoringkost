@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dasbord Manajemen Kost Barokfi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .modal-bg {
+            background-color: rgba(0, 0, 0, 0.5);
+            transition: opacity 0.3s ease;
+        }
+        
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+    </style>
+</head>
+
+<body class="bg-stone-50 text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-slate-900">Dasbord Manajemen Kost Barokfi</h1>
+            <p class="text-slate-600 mt-1">Selamat datang! Pantau status pembayaran dan keuangan kos Anda di sini.</p>
+        </header>
+
+        <div class="flex justify-end mb-6">
+            <button id="add-tenant-btn" class="bg-teal-600 text-white rounded-lg px-6 py-3 shadow-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Tambah Penyewa Baru
+            </button>
+        </div>
+
+        <main>
+            <section id="key-metrics" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                    <h3 class="text-sm font-medium text-slate-500">Total Pemasukan (Bulan Ini)</h3>
+                    <p id="metric-income" class="text-2xl font-semibold text-teal-600 mt-2">Rp 0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                    <h3 class="text-sm font-medium text-slate-500">Tunggakan (Belum Lunas)</h3>
+                    <p id="metric-due" class="text-2xl font-semibold text-amber-600 mt-2">Rp 0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                    <h3 class="text-sm font-medium text-slate-500">Okupansi Kamar</h3>
+                    <p id="metric-occupancy" class="text-2xl font-semibold text-slate-800 mt-2">0 / 0</p>
+                </div>
+            </section>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <h2 class="text-xl font-bold text-slate-900">Status Pembayaran</h2>
+                        <div id="filters" class="flex items-center gap-2 flex-wrap">
+                            <button data-filter="all" class="filter-btn bg-teal-600 text-white px-4 py-2 text-sm font-medium rounded-lg shadow-sm">Semua</button>
+                            <button data-filter="unpaid" class="filter-btn bg-white text-slate-700 px-4 py-2 text-sm font-medium rounded-lg border border-stone-300">Belum Lunas</button>
+                            <button data-filter="due_soon" class="filter-btn bg-white text-slate-700 px-4 py-2 text-sm font-medium rounded-lg border border-stone-300">Jatuh Tempo</button>
+                            <button data-filter="paid" class="filter-btn bg-white text-slate-700 px-4 py-2 text-sm font-medium rounded-lg border border-stone-300">Lunas</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 mb-4">
+                        <label for="month-select" class="text-sm font-medium text-slate-700">Bulan:</label>
+                        <select id="month-select" class="px-3 py-2 text-sm rounded-lg border border-stone-300 bg-white"></select>
+                        <label for="year-select" class="text-sm font-medium text-slate-700">Tahun:</label>
+                        <select id="year-select" class="px-3 py-2 text-sm rounded-lg border border-stone-300 bg-white"></select>
+                        <button id="apply-period-filter" class="bg-teal-600 text-white px-4 py-2 text-sm font-medium rounded-lg shadow-sm hover:bg-teal-700">Terapkan</button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-600">
+                            <thead class="text-xs text-slate-700 uppercase bg-stone-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Penyewa</th>
+                                    <th scope="col" class="px-6 py-3">Jatuh Tempo</th>
+                                    <th scope="col" class="px-6 py-3">Status</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Aksi</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Hapus</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tenant-table-body">
+                            </tbody>
+                        </table>
+                        <p id="empty-state" class="text-center py-12 text-slate-500 hidden">Tidak ada data untuk filter yang dipilih.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                    <h2 class="text-xl font-bold text-slate-900 mb-2">Ringkasan Pembayaran</h2>
+                    <p class="text-sm text-slate-500 mb-6">Visualisasi status pembayaran penyewa bulan ini.</p>
+                    <div class="chart-container relative h-64 md:h-72 lg:h-80 w-full max-w-sm mx-auto">
+                        <canvas id="payment-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <div id="modal-container"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+
+                    // --- DATA ---
+                    const NAMA_KOS = "Barokfi Kost Putra dan Putri"; // Change this to your boarding house name
+                    let tenants = []; // Data penghuni kosong
+                    let payments = []; // Data pembayaran kosong
+
+                    let currentFilter = 'all';
+                    let paymentChart;
+
+                    const monthNames = [
+                        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                    ];
+
+                    let currentSelectedDate = new Date(); // Defaults to current date
+                    currentSelectedDate.setDate(1); // Set to the first day of the month for consistent period calculation
+
+                    // --- LOCAL STORAGE FUNCTIONS ---
+                    const saveData = () => {
+                        try {
+                            localStorage.setItem('tenantsData', JSON.stringify(tenants));
+                            localStorage.setItem('paymentsData', JSON.stringify(payments));
+                            console.log('Data saved to LocalStorage.');
+                        } catch (e) {
+                            console.error('Error saving data to LocalStorage:', e);
+                            alert('Gagal menyimpan data ke penyimpanan lokal. Pastikan ruang penyimpanan tersedia.');
+                        }
+                    };
+
+                    const loadData = () => {
+                        try {
+                            const savedTenants = localStorage.getItem('tenantsData');
+                            const savedPayments = localStorage.getItem('paymentsData');
+                            if (savedTenants) {
+                                tenants = JSON.parse(savedTenants);
+                                // Convert entryDate strings back to Date objects if needed for Date-specific operations
+                                tenants.forEach(tenant => {
+                                    if (typeof tenant.entryDate === 'string') {
+                                        tenant.entryDate = new Date(tenant.entryDate);
+                                    }
+                                });
+                            }
+                            if (savedPayments) {
+                                payments = JSON.parse(savedPayments);
+                                // Convert payment date strings back to Date objects if needed
+                                payments.forEach(payment => {
+                                    if (typeof payment.date === 'string') {
+                                        payment.date = new Date(payment.date);
+                                    }
+                                });
+                            }
+                            console.log('Data loaded from LocalStorage.');
+                        } catch (e) {
+                            console.error('Error loading data from LocalStorage:', e);
+                            alert('Gagal memuat data dari penyimpanan lokal. Data mungkin rusak.');
+                        }
+                    };
+
+                    // --- UTILITY FUNCTIONS ---
+                    const formatCurrency = (amount) => `Rp ${new Intl.NumberFormat('id-ID').format(amount)}`;
+
+                    const getDueDateForPeriod = (entryDateObj, targetMonthIndex, targetYear) => {
+                        let dueDate = new Date(targetYear, targetMonthIndex, entryDateObj.getDate());
+
+                        // If setting the date results in a different month, it means the entryDate.getDate() was too high
+                        // for the target month (e.g., 31st in February). Set it to the last day of the target month.
+                        if (dueDate.getMonth() !== targetMonthIndex) {
+                            dueDate = new Date(targetYear, targetMonthIndex + 1, 0); // Setting day to 0 gets the last day of the previous month (targetMonthIndex + 1)
+                        }
+                        return dueDate;
+                    };
+
+
+                    const getTenantPaymentStatus = (tenant, selectedDate) => {
+                        const targetMonth = selectedDate.getMonth();
+                        const targetYear = selectedDate.getFullYear();
+                        const period = new Intl.DateTimeFormat('id-ID', {
+                            month: 'long',
+                            year: 'numeric'
+                        }).format(selectedDate);
+
+                        const entryDate = new Date(tenant.entryDate); // Ensure it's a Date object
+                        const entryMonth = entryDate.getMonth();
+                        const entryYear = entryDate.getFullYear();
+
+                        // 1. Check if the selected period is before the tenant's entry date
+                        if (targetYear < entryYear || (targetYear === entryYear && targetMonth < entryMonth)) {
+                            return {
+                                ...tenant,
+                                period,
+                                dueDate: null, // No due date as tenant hasn't entered
+                                totalPaid: 0,
+                                isPaid: false,
+                                status: 'not_yet_entered',
+                                statusText: `Penyewa belum masuk di bulan ${monthNames[targetMonth]}`,
+                                statusColor: 'bg-stone-200 text-stone-700',
+                                diffDays: null
+                            };
+                        }
+
+                        // Calculate payment details for the current period
+                        const dueDate = getDueDateForPeriod(entryDate, targetMonth, targetYear);
+                        const totalPaid = payments
+                            .filter(p => p.tenantId === tenant.id && p.period === period)
+                            .reduce((sum, p) => sum + p.amount, 0);
+                        const isPaid = totalPaid >= tenant.rent;
+
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        const diffTime = dueDate.getTime() - today.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        let status, statusText, statusColor;
+
+                        if (isPaid) {
+                            status = 'paid';
+                            statusText = 'Lunas';
+                            statusColor = 'bg-teal-100 text-teal-800';
+                        } else {
+                            // If not paid, check if it's the first month
+                            if (targetYear === entryYear && targetMonth === entryMonth) {
+                                status = 'first_month_unpaid'; // New status for unpaid first month
+                                statusText = 'Bulan pertama penyewa masuk';
+                                statusColor = 'bg-blue-100 text-blue-800'; // A new color for this status
+                            } else if (diffDays < 0) {
+                                status = 'overdue';
+                                statusText = `Terlambat ${Math.abs(diffDays)} hari`;
+                                statusColor = 'bg-red-100 text-red-800';
+                            } else if (diffDays === 0) {
+                                status = 'due_soon';
+                                statusText = `Jatuh tempo Hari Ini`;
+                                statusColor = 'bg-amber-100 text-amber-800';
+                            } else if (diffDays > 0 && diffDays <= 3) {
+                                status = 'due_soon';
+                                statusText = `Jatuh tempo dalam ${diffDays} hari`;
+                                statusColor = 'bg-amber-100 text-amber-800';
+                            } else {
+                                status = 'unpaid';
+                                statusText = 'Belum Lunas';
+                                statusColor = 'bg-stone-100 text-stone-800';
+                            }
+                        }
+
+                        return {
+                            ...tenant,
+                            period,
+                            dueDate,
+                            totalPaid,
+                            isPaid,
+                            status,
+                            statusText,
+                            statusColor,
+                            diffDays
+                        };
+                    };
+
+                    // --- RENDER FUNCTIONS ---
+                    const populateMonthYearSelectors = () => {
+                        const monthSelect = document.getElementById('month-select');
+                        const yearSelect = document.getElementById('year-select');
+                        const currentYear = new Date().getFullYear();
+
+                        monthSelect.innerHTML = '';
+                        yearSelect.innerHTML = '';
+
+                        monthNames.forEach((name, index) => {
+                            const option = document.createElement('option');
+                            option.value = index;
+                            option.textContent = name;
+                            if (index === currentSelectedDate.getMonth()) {
+                                option.selected = true;
+                            }
+                            monthSelect.appendChild(option);
+                        });
+
+                        for (let i = currentYear - 2; i <= currentYear + 5; i++) {
+                            const option = document.createElement('option');
+                            option.value = i;
+                            option.textContent = i;
+                            if (i === currentSelectedDate.getFullYear()) {
+                                option.selected = true;
+                            }
+                            yearSelect.appendChild(option);
+                        }
+                    };
+
+                    const renderTable = () => {
+                            const tableBody = document.getElementById('tenant-table-body');
+                            const emptyState = document.getElementById('empty-state');
+                            tableBody.innerHTML = '';
+
+                            const processedTenants = tenants.map(t => getTenantPaymentStatus(t, currentSelectedDate));
+
+                            const filteredTenants = processedTenants.filter(t => {
+                                if (currentFilter === 'all') return true;
+                                if (currentFilter === 'paid') return t.isPaid;
+                                // For 'unpaid', include 'overdue', 'unpaid', and 'first_month_unpaid' statuses, but exclude 'not_yet_entered'
+                                if (currentFilter === 'unpaid') return !t.isPaid && (t.status === 'overdue' || t.status === 'unpaid' || t.status === 'first_month_unpaid');
+                                if (currentFilter === 'due_soon') return !t.isPaid && t.status === 'due_soon';
+                                // If filter is for 'not_yet_entered' (though no explicit button for it, it might be implicitly filtered)
+                                if (currentFilter === 'not_yet_entered') return t.status === 'not_yet_entered';
+                                return false;
+                            });
+
+                            const statusOrder = {
+                                'overdue': 1,
+                                'due_soon': 2,
+                                'first_month_unpaid': 3, // New status order
+                                'unpaid': 4,
+                                'not_yet_entered': 5,
+                                'paid': 6
+                            };
+
+                            filteredTenants.sort((a, b) => {
+                                const orderA = statusOrder[a.status];
+                                const orderB = statusOrder[b.status];
+
+                                if (orderA !== orderB) {
+                                    return orderA - orderB;
+                                }
+                                // For overdue/due_soon, sort by diffDays
+                                if (a.status === 'overdue' || a.status === 'due_soon') {
+                                    return a.diffDays - b.diffDays;
+                                }
+                                return 0; // Maintain original order for other statuses
+                            });
+
+
+                            if (filteredTenants.length === 0) {
+                                emptyState.classList.remove('hidden');
+                                tableBody.classList.add('hidden');
+                            } else {
+                                emptyState.classList.add('hidden');
+                                tableBody.classList.remove('hidden');
+                            }
+
+                            filteredTenants.forEach(tenant => {
+                                        let dueDateDisplay = '';
+                                        if (tenant.dueDate) {
+                                            const dueDateFormatted = new Intl.DateTimeFormat('id-ID', {
+                                                day: 'numeric',
+                                                month: 'long',
+                                                year: 'numeric'
+                                            }).format(tenant.dueDate);
+                                            dueDateDisplay = dueDateFormatted;
+                                            // Only add status text if not paid and not just 'unpaid' (i.e., overdue, due soon, or first_month_unpaid)
+                                            if (!tenant.isPaid && (tenant.status === 'overdue' || tenant.status === 'due_soon' || tenant.status === 'first_month_unpaid')) {
+                                                dueDateDisplay += ` <span class="text-xs text-slate-500">(${tenant.statusText})</span>`;
+                                            }
+                                        } else {
+                                            dueDateDisplay = '<span class="text-slate-500">-</span>'; // For 'not_yet_entered' status
+                                        }
+
+
+                                        const waReminderText = `Halo kak ${tenant.name} dari Kamar ${tenant.room},%0AKami ingin mengingatkan bahwa pembayaran sewa kos untuk periode ${tenant.period} sebesar ${formatCurrency(tenant.rent)} akan jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}.%0AMohon segera dilakukan pembayaran.%0ATerima kasih.%0APemilik ${NAMA_KOS}`;
+                                        const waOverdueText = `Halo kak ${tenant.name} dari Kamar ${tenant.room},%0APembayaran sewa kos Anda untuk periode ${tenant.period} sebesar ${formatCurrency(tenant.rent)} telah melewati tanggal jatuh tempo ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)} dan ${tenant.statusText.toLowerCase().replace('terlambat ', '')}.%0AMohon segera dilunasi untuk menghindari denda keterlambatan.%0ATerima kasih.%0APemilik ${NAMA_KOS}`;
+                                        const waTodayDueText = `Halo kak ${tenant.name} dari Kamar ${tenant.room},%0APembayaran sewa kos Anda untuk periode ${tenant.period} sebesar ${formatCurrency(tenant.rent)} jatuh tempo HARI INI, ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}.%0AMohon segera dilunasi.%0ATerima kasih.%0APemilik ${NAMA_KOS}`;
+
+
+                                        let waLink = '';
+                                        // Only generate WA link if not paid and not 'not_yet_entered' or 'first_month_unpaid' (unless a specific WA for first month is desired)
+                                        // For 'first_month_unpaid', we'll currently not generate a specific WA link to avoid over-messaging.
+                                        if (!tenant.isPaid && tenant.status !== 'not_yet_entered' && tenant.status !== 'first_month_unpaid') {
+                                            if (tenant.status === 'overdue') {
+                                                waLink = `https://wa.me/${tenant.phone}?text=${waOverdueText}`;
+                                            } else if (tenant.diffDays === 0 && currentSelectedDate.getMonth() === new Date().getMonth() && currentSelectedDate.getFullYear() === new Date().getFullYear()) { // Only show "Today Due" if looking at current month
+                                                waLink = `https://wa.me/${tenant.phone}?text=${waTodayDueText}`;
+                                            } else if (tenant.diffDays > 0 && tenant.diffDays <= 3 && currentSelectedDate.getMonth() === new Date().getMonth() && currentSelectedDate.getFullYear() === new Date().getFullYear()) { // Only show "Due Soon" if looking at current month
+                                                waLink = `https://wa.me/${tenant.phone}?text=${waReminderText}`;
+                                            }
+                                        }
+
+                                        const row = `
+                        <tr class="bg-white border-b border-stone-200 hover:bg-stone-50">
+                            <td class="px-6 py-4 font-medium text-slate-900">
+                                ${tenant.name}
+                                <div class="text-xs text-slate-500">Kamar ${tenant.room}</div>
+                            </td>
+                            <td class="px-6 py-4">${dueDateDisplay}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full ${tenant.statusColor}">
+                                    ${tenant.statusText}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                ${!tenant.isPaid && tenant.status !== 'not_yet_entered' ? `
+                                    <button data-action="log-payment" data-id="${tenant.id}" class="text-teal-600 hover:text-teal-800 font-medium mr-4">Bayar</button>
+                                    ${waLink ? `<a href="${waLink}" target="_blank" class="text-amber-600 hover:text-amber-800 font-medium">WA</a>` : '<span class="text-slate-400">-</span>'}
+                                ` : '<span class="text-slate-400">-</span>'}
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <button data-action="delete-tenant" data-id="${tenant.id}" class="text-red-600 hover:text-red-800 font-medium">Hapus</button>
+                            </td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                });
+            };
+
+            const renderMetricsAndChart = () => {
+                const processedTenants = tenants.map(t => getTenantPaymentStatus(t, currentSelectedDate));
+
+                // Filter out 'not_yet_entered' tenants from financial calculations
+                const activeTenants = processedTenants.filter(t => t.status !== 'not_yet_entered');
+
+                const totalIncome = activeTenants
+                    .filter(t => t.isPaid)
+                    .reduce((sum, t) => sum + t.rent, 0);
+
+                const totalDue = activeTenants
+                    .filter(t => !t.isPaid)
+                    .reduce((sum, t) => sum + t.rent, 0);
+
+                const paidCount = activeTenants.filter(t => t.isPaid).length;
+                const unpaidCount = activeTenants.length - paidCount; // Only count active tenants for unpaid
+
+                document.getElementById('metric-income').textContent = formatCurrency(totalIncome);
+                document.getElementById('metric-due').textContent = formatCurrency(totalDue);
+                document.getElementById('metric-occupancy').textContent = `${activeTenants.length} / ${tenants.length}`; // Occupancy based on total tenants vs active
+
+                const ctx = document.getElementById('payment-chart').getContext('2d');
+                if (paymentChart) {
+                    paymentChart.destroy();
+                }
+                paymentChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Lunas', 'Belum Lunas'],
+                        datasets: [{
+                            label: 'Status Pembayaran',
+                            data: [paidCount, unpaidCount],
+                            backgroundColor: [
+                                'rgba(13, 148, 136, 0.8)', // teal-600
+                                'rgba(245, 158, 11, 0.8)' // amber-500
+                            ],
+                            borderColor: [
+                                '#ffffff',
+                                '#ffffff'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    boxWidth: 12,
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed !== null) {
+                                            label += context.parsed + ' penyewa';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            const renderModal = (type, id = null) => {
+                const modalContainer = document.getElementById('modal-container');
+                let title, content;
+                const tenant = id ? tenants.find(t => t.id === id) : null;
+
+                if (type === 'addTenant') {
+                    title = "Tambah Penyewa Baru";
+                    content = `
+                        <div class="space-y-4">
+                            <div>
+                                <label for="name" class="block text-sm font-medium text-slate-700">Nama Lengkap</label>
+                                <input type="text" id="name" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="room" class="block text-sm font-medium text-slate-700">No. Kamar</label>
+                                    <input type="text" id="room" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                </div>
+                                <div>
+                                    <label for="phone" class="block text-sm font-medium text-slate-700">No. WA (62..)</label>
+                                    <input type="text" id="phone" required placeholder="62812..." class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="entryDate" class="block text-sm font-medium text-slate-700">Tanggal Masuk</label>
+                                    <input type="date" id="entryDate" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                </div>
+                                <div>
+                                    <label for="rent" class="block text-sm font-medium text-slate-700">Harga Sewa (Rp)</label>
+                                    <input type="number" id="rent" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <button data-action="close-modal" class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50">Batal</button>
+                            <button id="save-tenant-btn" class="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">Simpan</button>
+                        </div>
+                    `;
+                } else if (type === 'logPayment' && tenant) {
+                    const today = new Date();
+                    const period = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(currentSelectedDate); // Use currentSelectedDate for period
+                    title = `Catat Pembayaran: ${tenant.name}`;
+                    content = `
+                        <div class="space-y-4">
+                            <div>
+                                <label for="payment_period" class="block text-sm font-medium text-slate-700">Periode Pembayaran</label>
+                                <input type="text" id="payment_period" value="${period}" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm" readonly>
+                            </div>
+                            <div>
+                                <label for="payment_amount" class="block text-sm font-medium text-slate-700">Jumlah Bayar (Rp)</label>
+                                <input type="number" id="payment_amount" value="${tenant.rent}" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                            </div>
+                            <div>
+                                <label for="payment_date" class="block text-sm font-medium text-slate-700">Tanggal Pembayaran</label>
+                                <input type="date" id="payment_date" value="${today.toISOString().split('T')[0]}" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <button data-action="close-modal" class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50">Batal</button>
+                            <button id="save-payment-btn" data-id="${tenant.id}" class="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">Simpan Pembayaran</button>
+                        </div>
+                    `;
+                } else if (type === 'confirmDelete' && tenant) {
+                    title = "Konfirmasi Penghapusan";
+                    content = `
+                        <p class="text-slate-700 mb-4">Anda yakin ingin menghapus penghuni **${tenant.name} (Kamar ${tenant.room})**?</p>
+                        <p class="text-sm text-red-600">Tindakan ini tidak dapat dibatalkan dan semua data pembayaran terkait juga akan terhapus.</p>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <button data-action="close-modal" class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50">Batal</button>
+                            <button id="confirm-delete-btn" data-id="${tenant.id}" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">Ya, Hapus</button>
+                        </div>
+                    `;
+                }
+
+                const modalHTML = `
+                    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-bg opacity-0">
+                        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 modal-content transform scale-95">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold text-slate-900">${title}</h3>
+                                <button data-action="close-modal" class="text-slate-400 hover:text-slate-600">&times;</button>
+                            </div>
+                            <div>${content}</div>
+                        </div>
+                    </div>
+                `;
+
+                modalContainer.innerHTML = modalHTML;
+                setTimeout(() => {
+                    const modal = document.getElementById('modal');
+                    modal.classList.remove('opacity-0');
+                    modal.querySelector('.modal-content').classList.remove('scale-95');
+                }, 10);
+            };
+
+            const closeModal = () => {
+                const modal = document.getElementById('modal');
+                if (modal) {
+                    modal.classList.add('opacity-0');
+                    modal.querySelector('.modal-content').classList.add('scale-95');
+                    setTimeout(() => {
+                        document.getElementById('modal-container').innerHTML = '';
+                    }, 300);
+                }
+            };
+
+            // --- EVENT HANDLERS & ACTIONS ---
+            const handleFilterClick = (e) => {
+                const btn = e.target.closest('.filter-btn');
+                if (!btn) return;
+
+                currentFilter = btn.dataset.filter;
+
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.classList.remove('bg-teal-600', 'text-white');
+                    b.classList.add('bg-white', 'text-slate-700');
+                });
+                btn.classList.add('bg-teal-600', 'text-white');
+                btn.classList.remove('bg-white', 'text-slate-700');
+
+                renderTable();
+            };
+
+            const handleTableClick = (e) => {
+                const action = e.target.dataset.action;
+                const id = parseInt(e.target.dataset.id);
+                if (action === 'log-payment') {
+                    renderModal('logPayment', id);
+                } else if (action === 'delete-tenant') {
+                    renderModal('confirmDelete', id);
+                }
+            };
+
+            const handleModalAction = (e) => {
+                const action = e.target.dataset.action;
+                if (action === 'close-modal') {
+                    closeModal();
+                    return;
+                }
+
+                const btnId = e.target.id;
+                if (btnId === 'save-tenant-btn') {
+                    const newTenant = {
+                        id: tenants.length > 0 ? Math.max(...tenants.map(t => t.id)) + 1 : 1,
+                        name: document.getElementById('name').value,
+                        room: document.getElementById('room').value,
+                        phone: document.getElementById('phone').value,
+                        entryDate: document.getElementById('entryDate').value, // Save as string
+                        rent: parseFloat(document.getElementById('rent').value),
+                    };
+                    if(newTenant.name && newTenant.room && newTenant.phone && newTenant.entryDate && !isNaN(newTenant.rent)) {
+                        tenants.push(newTenant);
+                        saveData(); // Save data after modification
+                        updateAll();
+                        closeModal();
+                    } else {
+                        alert("Harap isi semua kolom dengan benar.");
+                    }
+                } else if (btnId === 'save-payment-btn') {
+                    const newPayment = {
+                        tenantId: parseInt(e.target.dataset.id),
+                        period: document.getElementById('payment_period').value,
+                        amount: parseFloat(document.getElementById('payment_amount').value),
+                        date: document.getElementById('payment_date').value, // Save as string
+                    };
+                    if(newPayment.period && !isNaN(newPayment.amount) && newPayment.date) {
+                        payments.push(newPayment);
+                        saveData(); // Save data after modification
+                        updateAll();
+                        closeModal();
+                    } else {
+                        alert("Harap isi semua kolom dengan benar.");
+                    }
+                } else if (btnId === 'confirm-delete-btn') {
+                    const tenantToDeleteId = parseInt(e.target.dataset.id);
+                    tenants = tenants.filter(t => t.id !== tenantToDeleteId);
+                    payments = payments.filter(p => p.tenantId !== tenantToDeleteId); // Also remove associated payments
+                    saveData(); // Save data after modification
+                    updateAll();
+                    closeModal();
+                }
+            };
+
+            const handlePeriodFilter = () => {
+                const month = parseInt(document.getElementById('month-select').value);
+                const year = parseInt(document.getElementById('year-select').value);
+                currentSelectedDate = new Date(year, month, 1); // Set to the first day of the selected month
+                updateAll();
+            };
+
+            // --- INITIALIZATION ---
+            const updateAll = () => {
+                renderTable();
+                renderMetricsAndChart();
+            };
+
+            // Load data first, then initialize selectors and render
+            loadData();
+            populateMonthYearSelectors(); 
+            document.getElementById('filters').addEventListener('click', handleFilterClick);
+            document.getElementById('tenant-table-body').addEventListener('click', handleTableClick);
+            document.getElementById('modal-container').addEventListener('click', handleModalAction);
+            document.getElementById('add-tenant-btn').addEventListener('click', () => renderModal('addTenant'));
+            document.getElementById('apply-period-filter').addEventListener('click', handlePeriodFilter);
+
+            updateAll(); // Initial render with loaded data
+
+        });
+    </script>
+
+</body>
+
+</html>
