@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dasbord Manajemen Kost Barokfi</title>
+    <title>Dasbor Manajemen Kost Barokfi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -29,11 +29,17 @@
     <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8">
 
         <header class="mb-8">
-            <h1 class="text-3xl font-bold text-slate-900">Dasbord Manajemen Kost Barokfi</h1>
+            <h1 class="text-3xl font-bold text-slate-900">Dasbor Manajemen Kost Barokfi</h1>
             <p class="text-slate-600 mt-1">Selamat datang! Pantau status pembayaran dan keuangan kos Anda di sini.</p>
         </header>
 
-        <div class="flex justify-end mb-6">
+        <div class="flex justify-end mb-6 gap-3">
+            <button id="download-excel-btn" class="bg-green-600 text-white rounded-lg px-6 py-3 shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+                Download Data (Excel)
+            </button>
             <button id="add-tenant-btn" class="bg-teal-600 text-white rounded-lg px-6 py-3 shadow-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -83,6 +89,8 @@
                             <thead class="text-xs text-slate-700 uppercase bg-stone-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">Penyewa</th>
+                                    <th scope="col" class="px-6 py-3">Deposit</th>
+                                    <th scope="col" class="px-6 py-3">Interval</th>
                                     <th scope="col" class="px-6 py-3">Jatuh Tempo</th>
                                     <th scope="col" class="px-6 py-3">Status</th>
                                     <th scope="col" class="px-6 py-3 text-center">Aksi</th>
@@ -114,9 +122,9 @@
         document.addEventListener('DOMContentLoaded', function() {
 
                     // --- DATA ---
-                    const NAMA_KOS = "Barokfi Kost Putra dan Putri"; // Change this to your boarding house name
-                    let tenants = []; // Data penghuni kosong
-                    let payments = []; // Data pembayaran kosong
+                    const NAMA_KOS = "Barokfi Kost Putra dan Putri"; // Ubah ini dengan nama kos Anda
+                    let tenants = []; // Data penghuni
+                    let payments = []; // Data pembayaran
 
                     let currentFilter = 'all';
                     let paymentChart;
@@ -126,17 +134,24 @@
                         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
                     ];
 
-                    let currentSelectedDate = new Date(); // Defaults to current date
-                    currentSelectedDate.setDate(1); // Set to the first day of the month for consistent period calculation
+                    const paymentIntervalLabels = {
+                        "monthly": "Bulanan",
+                        "quarterly": "3 Bulanan",
+                        "biannually": "6 Bulanan",
+                        "annually": "Tahunan"
+                    };
 
-                    // --- LOCAL STORAGE FUNCTIONS ---
+                    let currentSelectedDate = new Date(); // Default ke tanggal saat ini
+                    currentSelectedDate.setDate(1); // Atur ke hari pertama bulan untuk perhitungan periode yang konsisten
+
+                    // --- FUNGSI LOCAL STORAGE ---
                     const saveData = () => {
                         try {
                             localStorage.setItem('tenantsData', JSON.stringify(tenants));
                             localStorage.setItem('paymentsData', JSON.stringify(payments));
-                            console.log('Data saved to LocalStorage.');
+                            console.log('Data disimpan ke LocalStorage.');
                         } catch (e) {
-                            console.error('Error saving data to LocalStorage:', e);
+                            console.error('Kesalahan saat menyimpan data ke LocalStorage:', e);
                             alert('Gagal menyimpan data ke penyimpanan lokal. Pastikan ruang penyimpanan tersedia.');
                         }
                     };
@@ -147,31 +162,86 @@
                             const savedPayments = localStorage.getItem('paymentsData');
                             if (savedTenants) {
                                 tenants = JSON.parse(savedTenants);
-                                // Convert entryDate strings back to Date objects if needed for Date-specific operations
+                                // Konversi string entryDate dan lastPaidPeriodEnd kembali ke objek Date
                                 tenants.forEach(tenant => {
                                     if (typeof tenant.entryDate === 'string') {
                                         tenant.entryDate = new Date(tenant.entryDate);
                                     }
+                                    if (typeof tenant.lastPaidPeriodEnd === 'string') {
+                                        tenant.lastPaidPeriodEnd = new Date(tenant.lastPaidPeriodEnd);
+                                    } else if (tenant.lastPaidPeriodEnd === undefined) {
+                                        // Jika lastPaidPeriodEnd belum ada (dari data lama), inisialisasi dengan tanggal masuk
+                                        // Ini penting untuk perhitungan jatuh tempo awal
+                                        tenant.lastPaidPeriodEnd = new Date(tenant.entryDate);
+                                        tenant.lastPaidPeriodEnd.setDate(tenant.lastPaidPeriodEnd.getDate() - 1); // Set to day before entry for correct initial due
+                                    }
+                                    // Pastikan deposit ada dan berupa angka, default ke 0 jika tidak ada atau tidak valid
+                                    tenant.deposit = tenant.deposit ? parseFloat(tenant.deposit) : 0;
+                                    // Pastikan paymentInterval ada, default ke 'monthly' jika tidak ada
+                                    tenant.paymentInterval = tenant.paymentInterval || 'monthly';
                                 });
                             }
                             if (savedPayments) {
                                 payments = JSON.parse(savedPayments);
-                                // Convert payment date strings back to Date objects if needed
+                                // Konversi string tanggal pembayaran kembali ke objek Date
                                 payments.forEach(payment => {
                                     if (typeof payment.date === 'string') {
                                         payment.date = new Date(payment.date);
                                     }
                                 });
                             }
-                            console.log('Data loaded from LocalStorage.');
+                            console.log('Data dimuat dari LocalStorage.');
                         } catch (e) {
-                            console.error('Error loading data from LocalStorage:', e);
+                            console.error('Kesalahan saat memuat data dari LocalStorage:', e);
                             alert('Gagal memuat data dari penyimpanan lokal. Data mungkin rusak.');
                         }
                     };
 
-                    // --- UTILITY FUNCTIONS ---
+                    // --- FUNGSI UTILITAS ---
                     const formatCurrency = (amount) => `Rp ${new Intl.NumberFormat('id-ID').format(amount)}`;
+
+                    const addMonths = (date, months) => {
+                        const d = new Date(date);
+                        d.setMonth(d.getMonth() + months);
+                        // Handle cases where the original day doesn't exist in the new month
+                        if (d.getDate() !== date.getDate() && d.getMonth() !== (date.getMonth() + months) % 12) {
+                            d.setDate(0); // Set to last day of previous month
+                        }
+                        return d;
+                    };
+
+                    const getExpectedDueDate = (tenant) => {
+                        let dueDate = new Date(tenant.lastPaidPeriodEnd);
+                        dueDate.setDate(dueDate.getDate() + 1); // Start from the day after last paid period ends
+
+                        switch (tenant.paymentInterval) {
+                            case 'monthly':
+                                // If payment interval is monthly, due date is next month's entryDate
+                                return getDueDateForPeriod(tenant.entryDate, dueDate.getMonth(), dueDate.getFullYear());
+                            case 'quarterly':
+                                // Add 3 months to the month of the entry date, adjust year if needed
+                                let nextQuarterDate = addMonths(tenant.entryDate, 3);
+                                // Align nextQuarterDate to be after lastPaidPeriodEnd if tenant has already paid up to some point
+                                while (nextQuarterDate <= tenant.lastPaidPeriodEnd) {
+                                    nextQuarterDate = addMonths(nextQuarterDate, 3);
+                                }
+                                return getDueDateForPeriod(tenant.entryDate, nextQuarterDate.getMonth(), nextQuarterDate.getFullYear());
+                            case 'biannually':
+                                let nextHalfYearDate = addMonths(tenant.entryDate, 6);
+                                while (nextHalfYearDate <= tenant.lastPaidPeriodEnd) {
+                                    nextHalfYearDate = addMonths(nextHalfYearDate, 6);
+                                }
+                                return getDueDateForPeriod(tenant.entryDate, nextHalfYearDate.getMonth(), nextHalfYearDate.getFullYear());
+                            case 'annually':
+                                let nextYearDate = addMonths(tenant.entryDate, 12);
+                                while (nextYearDate <= tenant.lastPaidPeriodEnd) {
+                                    nextYearDate = addMonths(nextYearDate, 12);
+                                }
+                                return getDueDateForPeriod(tenant.entryDate, nextYearDate.getMonth(), nextYearDate.getFullYear());
+                            default:
+                                return getDueDateForPeriod(tenant.entryDate, dueDate.getMonth(), dueDate.getFullYear()); // Default ke bulanan
+                        }
+                    };
 
                     const getDueDateForPeriod = (entryDateObj, targetMonthIndex, targetYear) => {
                         let dueDate = new Date(targetYear, targetMonthIndex, entryDateObj.getDate());
@@ -188,55 +258,59 @@
                     const getTenantPaymentStatus = (tenant, selectedDate) => {
                         const targetMonth = selectedDate.getMonth();
                         const targetYear = selectedDate.getFullYear();
-                        const period = new Intl.DateTimeFormat('id-ID', {
+                        const periodDisplay = new Intl.DateTimeFormat('id-ID', {
                             month: 'long',
                             year: 'numeric'
                         }).format(selectedDate);
 
-                        const entryDate = new Date(tenant.entryDate); // Ensure it's a Date object
-                        const entryMonth = entryDate.getMonth();
-                        const entryYear = entryDate.getFullYear();
+                        const entryDate = new Date(tenant.entryDate); // Pastikan ini adalah objek Date
 
-                        // 1. Check if the selected period is before the tenant's entry date
-                        if (targetYear < entryYear || (targetYear === entryYear && targetMonth < entryMonth)) {
+                        // Tanggal jatuh tempo berikutnya berdasarkan interval pembayaran
+                        let expectedDueDate = getExpectedDueDate(tenant);
+                        expectedDueDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        let status, statusText, statusColor;
+                        let isPaidForCurrentPeriod = false; // Status apakah sudah lunas untuk periode yang *sedang* diperiksa (bukan hanya untuk bulan yang lewat)
+
+                        // Periksa apakah tenant baru masuk di bulan yang dipilih dan belum ada pembayaran
+                        const isEntryMonth = (targetYear === entryDate.getFullYear() && targetMonth === entryDate.getMonth());
+
+                        // Jika selectedDate lebih awal dari tanggal masuk, anggap belum masuk
+                        if (selectedDate.getTime() < entryDate.setDate(1) && selectedDate.getMonth() < entryDate.getMonth()) {
                             return {
                                 ...tenant,
-                                period,
-                                dueDate: null, // No due date as tenant hasn't entered
+                                periodDisplay,
+                                dueDate: null,
                                 totalPaid: 0,
                                 isPaid: false,
                                 status: 'not_yet_entered',
-                                statusText: `Penyewa belum masuk di bulan ${monthNames[targetMonth]}`,
+                                statusText: `Penyewa belum masuk`,
                                 statusColor: 'bg-stone-200 text-stone-700',
                                 diffDays: null
                             };
                         }
 
-                        // Calculate payment details for the current period
-                        const dueDate = getDueDateForPeriod(entryDate, targetMonth, targetYear);
-                        const totalPaid = payments
-                            .filter(p => p.tenantId === tenant.id && p.period === period)
-                            .reduce((sum, p) => sum + p.amount, 0);
-                        const isPaid = totalPaid >= tenant.rent;
+                        // Cek apakah pembayaran sudah dilakukan untuk periode yang relevan dengan `selectedDate`
+                        // Kita perlu membandingkan `selectedDate` dengan `lastPaidPeriodEnd`
+                        if (tenant.lastPaidPeriodEnd && selectedDate <= tenant.lastPaidPeriodEnd) {
+                            isPaidForCurrentPeriod = true;
+                        }
 
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-
-                        const diffTime = dueDate.getTime() - today.getTime();
+                        const diffTime = expectedDueDate.getTime() - today.getTime();
                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-                        let status, statusText, statusColor;
-
-                        if (isPaid) {
+                        if (isPaidForCurrentPeriod) {
                             status = 'paid';
                             statusText = 'Lunas';
                             statusColor = 'bg-teal-100 text-teal-800';
                         } else {
-                            // If not paid, check if it's the first month
-                            if (targetYear === entryYear && targetMonth === entryMonth) {
-                                status = 'first_month_unpaid'; // New status for unpaid first month
+                            if (isEntryMonth && today < expectedDueDate) { // Bulan pertama dan belum jatuh tempo
+                                status = 'first_month_unpaid';
                                 statusText = 'Bulan pertama penyewa masuk';
-                                statusColor = 'bg-blue-100 text-blue-800'; // A new color for this status
+                                statusColor = 'bg-blue-100 text-blue-800';
                             } else if (diffDays < 0) {
                                 status = 'overdue';
                                 statusText = `Terlambat ${Math.abs(diffDays)} hari`;
@@ -245,7 +319,7 @@
                                 status = 'due_soon';
                                 statusText = `Jatuh tempo Hari Ini`;
                                 statusColor = 'bg-amber-100 text-amber-800';
-                            } else if (diffDays > 0 && diffDays <= 3) {
+                            } else if (diffDays > 0 && diffDays <= 7) { // Beri toleransi lebih untuk jatuh tempo segera (misal 7 hari)
                                 status = 'due_soon';
                                 statusText = `Jatuh tempo dalam ${diffDays} hari`;
                                 statusColor = 'bg-amber-100 text-amber-800';
@@ -256,12 +330,18 @@
                             }
                         }
 
+                        // Untuk totalPaid, kita hanya menghitung pembayaran yang dicatat untuk periode terakhir
+                        // Ini bisa disederhanakan atau diperluas jika ingin melihat riwayat pembayaran per periode spesifik
+                        const relevantPayments = payments
+                            .filter(p => p.tenantId === tenant.id && new Date(p.date) >= tenant.lastPaidPeriodEnd) // Misal: pembayaran setelah periode terakhir lunas
+                            .reduce((sum, p) => sum + p.amount, 0);
+
                         return {
                             ...tenant,
-                            period,
-                            dueDate,
-                            totalPaid,
-                            isPaid,
+                            periodDisplay,
+                            dueDate: expectedDueDate,
+                            totalPaid: relevantPayments,
+                            isPaid: isPaidForCurrentPeriod, // Gunakan status yang lebih spesifik untuk tabel
                             status,
                             statusText,
                             statusColor,
@@ -269,7 +349,57 @@
                         };
                     };
 
-                    // --- RENDER FUNCTIONS ---
+                    // --- FUNGSI UNDUH EXCEL ---
+                    const downloadExcel = () => {
+                        const dataToDownload = [];
+
+                        // Add header row
+                        dataToDownload.push([
+                            'Nama Penyewa',
+                            'No. Kamar',
+                            'No. WA',
+                            'Tanggal Masuk',
+                            'Harga Sewa (Rp)',
+                            'Uang Deposit (Rp)',
+                            'Interval Pembayaran',
+                            `Status Pembayaran (${monthNames[currentSelectedDate.getMonth()]} ${currentSelectedDate.getFullYear()})`,
+                            `Jatuh Tempo Pembayaran Berikutnya`,
+                            'Tanggal Akhir Periode Terakhir Dibayar'
+                        ]);
+
+                        // Add tenant data
+                        tenants.forEach(tenant => {
+                            const statusData = getTenantPaymentStatus(tenant, currentSelectedDate);
+                            dataToDownload.push([
+                                tenant.name,
+                                tenant.room,
+                                tenant.phone,
+                                new Date(tenant.entryDate).toLocaleDateString('id-ID'), // Format entry date
+                                tenant.rent,
+                                tenant.deposit,
+                                paymentIntervalLabels[tenant.paymentInterval],
+                                statusData.statusText,
+                                statusData.dueDate ? new Date(statusData.dueDate).toLocaleDateString('id-ID') : '-',
+                                tenant.lastPaidPeriodEnd ? new Date(tenant.lastPaidPeriodEnd).toLocaleDateString('id-ID') : '-'
+                            ]);
+                        });
+
+                        let csvContent = dataToDownload.map(e => e.join(",")).join("\n");
+                        const blob = new Blob([csvContent], {
+                            type: 'text/csv;charset=utf-8;'
+                        });
+                        const link = document.createElement("a");
+                        const url = URL.createObjectURL(blob);
+                        link.setAttribute("href", url);
+                        link.setAttribute("download", `data_penyewa_kos_${monthNames[currentSelectedDate.getMonth()]}_${currentSelectedDate.getFullYear()}.csv`);
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    };
+
+
+                    // --- FUNGSI RENDER ---
                     const populateMonthYearSelectors = () => {
                         const monthSelect = document.getElementById('month-select');
                         const yearSelect = document.getElementById('year-select');
@@ -307,23 +437,21 @@
                             const processedTenants = tenants.map(t => getTenantPaymentStatus(t, currentSelectedDate));
 
                             const filteredTenants = processedTenants.filter(t => {
+                                if (t.status === 'not_yet_entered') return false; // Sembunyikan penyewa yang belum masuk untuk filter apa pun
                                 if (currentFilter === 'all') return true;
                                 if (currentFilter === 'paid') return t.isPaid;
-                                // For 'unpaid', include 'overdue', 'unpaid', and 'first_month_unpaid' statuses, but exclude 'not_yet_entered'
+                                // For 'unpaid', include 'overdue', 'unpaid', and 'first_month_unpaid' statuses
                                 if (currentFilter === 'unpaid') return !t.isPaid && (t.status === 'overdue' || t.status === 'unpaid' || t.status === 'first_month_unpaid');
                                 if (currentFilter === 'due_soon') return !t.isPaid && t.status === 'due_soon';
-                                // If filter is for 'not_yet_entered' (though no explicit button for it, it might be implicitly filtered)
-                                if (currentFilter === 'not_yet_entered') return t.status === 'not_yet_entered';
                                 return false;
                             });
 
                             const statusOrder = {
                                 'overdue': 1,
                                 'due_soon': 2,
-                                'first_month_unpaid': 3, // New status order
+                                'first_month_unpaid': 3,
                                 'unpaid': 4,
-                                'not_yet_entered': 5,
-                                'paid': 6
+                                'paid': 5
                             };
 
                             filteredTenants.sort((a, b) => {
@@ -333,11 +461,10 @@
                                 if (orderA !== orderB) {
                                     return orderA - orderB;
                                 }
-                                // For overdue/due_soon, sort by diffDays
                                 if (a.status === 'overdue' || a.status === 'due_soon') {
                                     return a.diffDays - b.diffDays;
                                 }
-                                return 0; // Maintain original order for other statuses
+                                return 0;
                             });
 
 
@@ -358,32 +485,27 @@
                                                 year: 'numeric'
                                             }).format(tenant.dueDate);
                                             dueDateDisplay = dueDateFormatted;
-                                            // Only add status text if not paid and not just 'unpaid' (i.e., overdue, due soon, or first_month_unpaid)
                                             if (!tenant.isPaid && (tenant.status === 'overdue' || tenant.status === 'due_soon' || tenant.status === 'first_month_unpaid')) {
                                                 dueDateDisplay += ` <span class="text-xs text-slate-500">(${tenant.statusText})</span>`;
                                             }
                                         } else {
-                                            dueDateDisplay = '<span class="text-slate-500">-</span>'; // For 'not_yet_entered' status
+                                            dueDateDisplay = '<span class="text-slate-500">-</span>';
                                         }
 
+                                        const waBaseText = `Halo kak ${tenant.name} dari Kamar ${tenant.room},%0A`;
+                                        let waMessageBody = '';
 
-                                        const waReminderText = `Halo kak ${tenant.name} dari Kamar ${tenant.room},%0AKami ingin mengingatkan bahwa pembayaran sewa kos untuk periode ${tenant.period} sebesar ${formatCurrency(tenant.rent)} akan jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}.%0AMohon segera dilakukan pembayaran.%0ATerima kasih.%0APemilik ${NAMA_KOS}`;
-                                        const waOverdueText = `Halo kak ${tenant.name} dari Kamar ${tenant.room},%0APembayaran sewa kos Anda untuk periode ${tenant.period} sebesar ${formatCurrency(tenant.rent)} telah melewati tanggal jatuh tempo ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)} dan ${tenant.statusText.toLowerCase().replace('terlambat ', '')}.%0AMohon segera dilunasi untuk menghindari denda keterlambatan.%0ATerima kasih.%0APemilik ${NAMA_KOS}`;
-                                        const waTodayDueText = `Halo kak ${tenant.name} dari Kamar ${tenant.room},%0APembayaran sewa kos Anda untuk periode ${tenant.period} sebesar ${formatCurrency(tenant.rent)} jatuh tempo HARI INI, ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}.%0AMohon segera dilunasi.%0ATerima kasih.%0APemilik ${NAMA_KOS}`;
-
-
-                                        let waLink = '';
-                                        // Only generate WA link if not paid and not 'not_yet_entered' or 'first_month_unpaid' (unless a specific WA for first month is desired)
-                                        // For 'first_month_unpaid', we'll currently not generate a specific WA link to avoid over-messaging.
-                                        if (!tenant.isPaid && tenant.status !== 'not_yet_entered' && tenant.status !== 'first_month_unpaid') {
-                                            if (tenant.status === 'overdue') {
-                                                waLink = `https://wa.me/${tenant.phone}?text=${waOverdueText}`;
-                                            } else if (tenant.diffDays === 0 && currentSelectedDate.getMonth() === new Date().getMonth() && currentSelectedDate.getFullYear() === new Date().getFullYear()) { // Only show "Today Due" if looking at current month
-                                                waLink = `https://wa.me/${tenant.phone}?text=${waTodayDueText}`;
-                                            } else if (tenant.diffDays > 0 && tenant.diffDays <= 3 && currentSelectedDate.getMonth() === new Date().getMonth() && currentSelectedDate.getFullYear() === new Date().getFullYear()) { // Only show "Due Soon" if looking at current month
-                                                waLink = `https://wa.me/${tenant.phone}?text=${waReminderText}`;
-                                            }
+                                        if (tenant.status === 'overdue') {
+                                            waMessageBody = `Pembayaran sewa kos Anda untuk periode berikutnya (jatuh tempo ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}) sebesar ${formatCurrency(tenant.rent)} telah melewati tanggal jatuh tempo ${tenant.statusText.toLowerCase().replace('terlambat ', '')}.%0AMohon segera dilunasi untuk menghindari denda keterlambatan.`;
+                                        } else if (tenant.status === 'due_soon' && tenant.diffDays === 0) {
+                                            waMessageBody = `Pembayaran sewa kos Anda untuk periode berikutnya sebesar ${formatCurrency(tenant.rent)} jatuh tempo HARI INI, ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}.%0AMohon segera dilunasi.`;
+                                        } else if (tenant.status === 'due_soon' && tenant.diffDays > 0) {
+                                            waMessageBody = `Kami ingin mengingatkan bahwa pembayaran sewa kos untuk periode berikutnya sebesar ${formatCurrency(tenant.rent)} akan jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)} (dalam ${tenant.diffDays} hari).%0AMohon segera dilakukan pembayaran.`;
                                         }
+
+                                        const waClosing = `%0ATerima kasih.%0APemilik ${NAMA_KOS}`;
+                                        const waLink = (waMessageBody && tenant.phone) ? `https://wa.me/${tenant.phone}?text=${encodeURIComponent(waBaseText + waMessageBody + waClosing)}` : '';
+
 
                                         const row = `
                         <tr class="bg-white border-b border-stone-200 hover:bg-stone-50">
@@ -391,6 +513,8 @@
                                 ${tenant.name}
                                 <div class="text-xs text-slate-500">Kamar ${tenant.room}</div>
                             </td>
+                            <td class="px-6 py-4">${formatCurrency(tenant.deposit)}</td>
+                            <td class="px-6 py-4">${paymentIntervalLabels[tenant.paymentInterval]}</td>
                             <td class="px-6 py-4">${dueDateDisplay}</td>
                             <td class="px-6 py-4">
                                 <span class="px-2 py-1 text-xs font-medium rounded-full ${tenant.statusColor}">
@@ -413,25 +537,62 @@
             };
 
             const renderMetricsAndChart = () => {
-                const processedTenants = tenants.map(t => getTenantPaymentStatus(t, currentSelectedDate));
+                // Untuk metrik pendapatan dan tunggakan, kita akan fokus pada pembayaran yang *seharusnya* diterima pada bulan yang sedang aktif
+                // Ini akan sedikit berbeda dari sebelumnya karena interval pembayaran.
+                // Pendekatan: Hitung total pendapatan bulanan yang diharapkan dari semua penyewa, dan berapa yang sudah dibayar.
 
-                // Filter out 'not_yet_entered' tenants from financial calculations
-                const activeTenants = processedTenants.filter(t => t.status !== 'not_yet_entered');
+                let totalExpectedMonthlyIncome = 0;
+                let totalOverdueAmount = 0;
+                let totalPaidThisMonth = 0;
 
-                const totalIncome = activeTenants
-                    .filter(t => t.isPaid)
-                    .reduce((sum, t) => sum + t.rent, 0);
+                const currentMonthStartDate = new Date(currentSelectedDate.getFullYear(), currentSelectedDate.getMonth(), 1);
+                const currentMonthEndDate = new Date(currentSelectedDate.getFullYear(), currentSelectedDate.getMonth() + 1, 0); // Last day of current month
 
-                const totalDue = activeTenants
-                    .filter(t => !t.isPaid)
-                    .reduce((sum, t) => sum + t.rent, 0);
+                tenants.forEach(tenant => {
+                    const statusData = getTenantPaymentStatus(tenant, currentSelectedDate);
 
-                const paidCount = activeTenants.filter(t => t.isPaid).length;
-                const unpaidCount = activeTenants.length - paidCount; // Only count active tenants for unpaid
+                    // Skip tenants who haven't entered yet for income/due calculations
+                    if (statusData.status === 'not_yet_entered') {
+                        return;
+                    }
+                    
+                    // Add expected rent for active tenants (even if overdue for a previous period, their rent is still expected)
+                    // Simplify: Assume we are interested in how much "rent" is due for THIS currentSelectedDate's period.
+                    // This is complex with various intervals. For simplicity, let's sum up rent for all active tenants.
+                    // A more accurate model would involve calculating actual pro-rata income for the month.
+                    // For now, let's stick to the base rent for active tenants for "expected monthly".
 
-                document.getElementById('metric-income').textContent = formatCurrency(totalIncome);
-                document.getElementById('metric-due').textContent = formatCurrency(totalDue);
-                document.getElementById('metric-occupancy').textContent = `${activeTenants.length} / ${tenants.length}`; // Occupancy based on total tenants vs active
+                    // Income: sum of paid rents whose due date (for that payment cycle) is <= currentMonthEndDate
+                    // This is tricky. Let's make it simpler:
+                    // Total Pemasukan (Bulan Ini) = Total pembayaran yang diterima di bulan ini
+                    const paymentsInCurrentMonth = payments.filter(p => {
+                        const paymentDate = new Date(p.date);
+                        return paymentDate.getMonth() === currentSelectedDate.getMonth() &&
+                               paymentDate.getFullYear() === currentSelectedDate.getFullYear();
+                    });
+                    totalPaidThisMonth += paymentsInCurrentMonth.reduce((sum, p) => sum + p.amount, 0);
+
+
+                    // Tunggakan: Total harga sewa dari semua penyewa yang statusnya 'overdue' atau 'unpaid' untuk periode yang *seharusnya* dibayar
+                    if (!statusData.isPaid && (statusData.status === 'overdue' || statusData.status === 'unpaid' || statusData.status === 'due_soon' || statusData.status === 'first_month_unpaid')) {
+                        totalOverdueAmount += tenant.rent; // Assuming rent is the amount due for their interval
+                    }
+                });
+
+                // Okupansi: Hanya hitung penyewa yang tidak berstatus 'not_yet_entered'
+                const activeTenantsCount = tenants.filter(t => {
+                    const status = getTenantPaymentStatus(t, currentSelectedDate).status;
+                    return status !== 'not_yet_entered';
+                }).length;
+
+                document.getElementById('metric-income').textContent = formatCurrency(totalPaidThisMonth);
+                document.getElementById('metric-due').textContent = formatCurrency(totalOverdueAmount);
+                document.getElementById('metric-occupancy').textContent = `${activeTenantsCount} / ${tenants.length}`;
+
+
+                const processedTenantsForChart = tenants.map(t => getTenantPaymentStatus(t, currentSelectedDate));
+                const paidCount = processedTenantsForChart.filter(t => t.isPaid && t.status !== 'not_yet_entered').length;
+                const unpaidCount = processedTenantsForChart.filter(t => !t.isPaid && t.status !== 'not_yet_entered').length;
 
                 const ctx = document.getElementById('payment-chart').getContext('2d');
                 if (paymentChart) {
@@ -518,9 +679,22 @@
                                     <input type="date" id="entryDate" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                 </div>
                                 <div>
-                                    <label for="rent" class="block text-sm font-medium text-slate-700">Harga Sewa (Rp)</label>
+                                    <label for="rent" class="block text-sm font-medium text-slate-700">Harga Sewa (Rp / interval)</label>
                                     <input type="number" id="rent" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                 </div>
+                            </div>
+                            <div>
+                                <label for="paymentInterval" class="block text-sm font-medium text-slate-700">Interval Pembayaran</label>
+                                <select id="paymentInterval" class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                    <option value="monthly">Bulanan</option>
+                                    <option value="quarterly">3 Bulanan</option>
+                                    <option value="biannually">6 Bulanan</option>
+                                    <option value="annually">Tahunan</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="deposit" class="block text-sm font-medium text-slate-700">Uang Deposit (Rp) <span class="text-slate-500 text-xs">(Opsional)</span></label>
+                                <input type="number" id="deposit" placeholder="0" class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                             </div>
                         </div>
                         <div class="mt-6 flex justify-end gap-3">
@@ -530,13 +704,19 @@
                     `;
                 } else if (type === 'logPayment' && tenant) {
                     const today = new Date();
-                    const period = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(currentSelectedDate); // Use currentSelectedDate for period
-                    title = `Catat Pembayaran: ${tenant.name}`;
+                    // Untuk log pembayaran, periode yang relevan adalah periode saat ini yang sedang jatuh tempo
+                    const currentStatus = getTenantPaymentStatus(tenant, currentSelectedDate);
+                    const periodText = `Sewa ${paymentIntervalLabels[tenant.paymentInterval]} (Jatuh Tempo: ${new Intl.DateTimeFormat('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}).format(currentStatus.dueDate)})`;
+
                     content = `
                         <div class="space-y-4">
                             <div>
-                                <label for="payment_period" class="block text-sm font-medium text-slate-700">Periode Pembayaran</label>
-                                <input type="text" id="payment_period" value="${period}" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm" readonly>
+                                <label for="payment_tenant_name" class="block text-sm font-medium text-slate-700">Penyewa</label>
+                                <input type="text" id="payment_tenant_name" value="${tenant.name} (Kamar ${tenant.room})" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm" readonly>
+                            </div>
+                            <div>
+                                <label for="payment_period_display" class="block text-sm font-medium text-slate-700">Deskripsi Pembayaran</label>
+                                <input type="text" id="payment_period_display" value="${periodText}" class="mt-1 block w-full px-3 py-2 bg-stone-100 border border-stone-300 rounded-md shadow-sm" readonly>
                             </div>
                             <div>
                                 <label for="payment_amount" class="block text-sm font-medium text-slate-700">Jumlah Bayar (Rp)</label>
@@ -582,6 +762,11 @@
                     modal.classList.remove('opacity-0');
                     modal.querySelector('.modal-content').classList.remove('scale-95');
                 }, 10);
+                
+                // Set default interval if adding new tenant
+                if (type === 'addTenant') {
+                    document.getElementById('paymentInterval').value = 'monthly'; // Default to monthly
+                }
             };
 
             const closeModal = () => {
@@ -631,42 +816,99 @@
 
                 const btnId = e.target.id;
                 if (btnId === 'save-tenant-btn') {
-                    const newTenant = {
-                        id: tenants.length > 0 ? Math.max(...tenants.map(t => t.id)) + 1 : 1,
-                        name: document.getElementById('name').value,
-                        room: document.getElementById('room').value,
-                        phone: document.getElementById('phone').value,
-                        entryDate: document.getElementById('entryDate').value, // Save as string
-                        rent: parseFloat(document.getElementById('rent').value),
-                    };
-                    if(newTenant.name && newTenant.room && newTenant.phone && newTenant.entryDate && !isNaN(newTenant.rent)) {
+                    const name = document.getElementById('name').value;
+                    const room = document.getElementById('room').value;
+                    const phone = document.getElementById('phone').value;
+                    const entryDateStr = document.getElementById('entryDate').value;
+                    const rent = parseFloat(document.getElementById('rent').value);
+                    const deposit = parseFloat(document.getElementById('deposit').value) || 0; // Deposit bersifat opsional, default ke 0
+                    const paymentInterval = document.getElementById('paymentInterval').value;
+
+                    if (name && room && phone && entryDateStr && !isNaN(rent) && paymentInterval) {
+                        const entryDate = new Date(entryDateStr);
+                        const newTenant = {
+                            id: tenants.length > 0 ? Math.max(...tenants.map(t => t.id)) + 1 : 1,
+                            name: name,
+                            room: room,
+                            phone: phone,
+                            entryDate: entryDate, // Simpan sebagai objek Date
+                            rent: rent,
+                            deposit: deposit,
+                            paymentInterval: paymentInterval,
+                            lastPaidPeriodEnd: new Date(entryDate) // Awalnya, periode terakhir yang dibayar adalah tanggal masuk
+                        };
+                        // Untuk kasus entryDate 1 Januari, maka lastPaidPeriodEnd adalah 31 Desember tahun sebelumnya.
+                        // Kita set 1 hari sebelum tanggal masuk untuk perhitungan jatuh tempo yang benar
+                        newTenant.lastPaidPeriodEnd.setDate(newTenant.lastPaidPeriodEnd.getDate() - 1);
+
                         tenants.push(newTenant);
-                        saveData(); // Save data after modification
+                        saveData(); // Simpan data setelah modifikasi
                         updateAll();
                         closeModal();
                     } else {
-                        alert("Harap isi semua kolom dengan benar.");
+                        alert("Harap isi semua kolom wajib (Nama, Kamar, No. WA, Tanggal Masuk, Harga Sewa, Interval Pembayaran) dengan benar.");
                     }
                 } else if (btnId === 'save-payment-btn') {
-                    const newPayment = {
-                        tenantId: parseInt(e.target.dataset.id),
-                        period: document.getElementById('payment_period').value,
-                        amount: parseFloat(document.getElementById('payment_amount').value),
-                        date: document.getElementById('payment_date').value, // Save as string
-                    };
-                    if(newPayment.period && !isNaN(newPayment.amount) && newPayment.date) {
-                        payments.push(newPayment);
-                        saveData(); // Save data after modification
+                    const tenantId = parseInt(e.target.dataset.id);
+                    const tenantIndex = tenants.findIndex(t => t.id === tenantId);
+                    if (tenantIndex === -1) {
+                        alert("Penyewa tidak ditemukan.");
+                        return;
+                    }
+                    const tenant = tenants[tenantIndex];
+
+                    const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
+                    const paymentDate = document.getElementById('payment_date').value;
+
+                    if (!isNaN(paymentAmount) && paymentDate) {
+                        // Logika utama: Update lastPaidPeriodEnd berdasarkan paymentInterval
+                        let newLastPaidPeriodEnd = new Date(tenant.lastPaidPeriodEnd);
+                        
+                        // Calculate the end date of the period being paid for
+                        switch (tenant.paymentInterval) {
+                            case 'monthly':
+                                newLastPaidPeriodEnd = addMonths(newLastPaidPeriodEnd, 1);
+                                break;
+                            case 'quarterly':
+                                newLastPaidPeriodEnd = addMonths(newLastPaidPeriodEnd, 3);
+                                break;
+                            case 'biannually':
+                                newLastPaidPeriodEnd = addMonths(newLastPaidPeriodEnd, 6);
+                                break;
+                            case 'annually':
+                                newLastPaidPeriodEnd = addMonths(newLastPaidPeriodEnd, 12);
+                                break;
+                        }
+                        
+                        // Ensure the newLastPaidPeriodEnd is at least the end of the *current* month being processed
+                        // This handles cases where a payment is made for a future period.
+                        // Or simplify: just advance based on interval
+                        // For simplicity, we just advance the `lastPaidPeriodEnd` by one full interval
+                        // and log the payment.
+
+                        // Simpan pembayaran
+                        payments.push({
+                            tenantId: tenantId,
+                            period: new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(newLastPaidPeriodEnd), // Store the *end* month of the paid period
+                            amount: paymentAmount,
+                            date: paymentDate, // Tanggal ketika pembayaran dilakukan
+                            paidForInterval: tenant.paymentInterval // Simpan interval yang dibayar
+                        });
+
+                        // Perbarui lastPaidPeriodEnd penyewa
+                        tenant.lastPaidPeriodEnd = newLastPaidPeriodEnd;
+                        
+                        saveData(); // Simpan data setelah modifikasi
                         updateAll();
                         closeModal();
                     } else {
-                        alert("Harap isi semua kolom dengan benar.");
+                        alert("Harap isi jumlah dan tanggal pembayaran dengan benar.");
                     }
                 } else if (btnId === 'confirm-delete-btn') {
                     const tenantToDeleteId = parseInt(e.target.dataset.id);
                     tenants = tenants.filter(t => t.id !== tenantToDeleteId);
-                    payments = payments.filter(p => p.tenantId !== tenantToDeleteId); // Also remove associated payments
-                    saveData(); // Save data after modification
+                    payments = payments.filter(p => p.tenantId !== tenantToDeleteId); // Hapus juga pembayaran terkait
+                    saveData(); // Simpan data setelah modifikasi
                     updateAll();
                     closeModal();
                 }
@@ -675,26 +917,28 @@
             const handlePeriodFilter = () => {
                 const month = parseInt(document.getElementById('month-select').value);
                 const year = parseInt(document.getElementById('year-select').value);
-                currentSelectedDate = new Date(year, month, 1); // Set to the first day of the selected month
+                currentSelectedDate = new Date(year, month, 1); // Atur ke hari pertama bulan yang dipilih
                 updateAll();
             };
 
-            // --- INITIALIZATION ---
+            // --- INISIALISASI ---
             const updateAll = () => {
                 renderTable();
                 renderMetricsAndChart();
             };
 
-            // Load data first, then initialize selectors and render
+            // Muat data terlebih dahulu, lalu inisialisasi pemilih dan render
             loadData();
-            populateMonthYearSelectors(); 
+            populateMonthYearSelectors();
             document.getElementById('filters').addEventListener('click', handleFilterClick);
             document.getElementById('tenant-table-body').addEventListener('click', handleTableClick);
             document.getElementById('modal-container').addEventListener('click', handleModalAction);
             document.getElementById('add-tenant-btn').addEventListener('click', () => renderModal('addTenant'));
             document.getElementById('apply-period-filter').addEventListener('click', handlePeriodFilter);
+            document.getElementById('download-excel-btn').addEventListener('click', downloadExcel); // Tambahkan event listener untuk tombol unduh
 
-            updateAll(); // Initial render with loaded data
+
+            updateAll(); // Render awal dengan data yang dimuat
 
         });
     </script>
