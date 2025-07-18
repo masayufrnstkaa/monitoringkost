@@ -49,14 +49,22 @@
         </div>
 
         <main>
-            <section id="key-metrics" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <section id="key-metrics" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
-                    <h3 class="text-sm font-medium text-slate-500">Total Pemasukan (Bulan Ini)</h3>
-                    <p id="metric-income" class="text-2xl font-semibold text-teal-600 mt-2">Rp 0</p>
+                    <h3 class="text-sm font-medium text-slate-500">Pemasukan Bulan Ini (<span id="current-month-name"></span>)</h3>
+                    <p id="metric-income-monthly" class="text-2xl font-semibold text-teal-600 mt-2">Rp 0</p>
                 </div>
                 <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
                     <h3 class="text-sm font-medium text-slate-500">Tunggakan (Belum Lunas)</h3>
                     <p id="metric-due" class="text-2xl font-semibold text-amber-600 mt-2">Rp 0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                    <h3 class="text-sm font-medium text-slate-500">Total Pemasukan Keseluruhan</h3>
+                    <p id="metric-income-overall" class="text-2xl font-semibold text-blue-600 mt-2">Rp 0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                    <h3 class="text-sm font-medium text-slate-500">Pemasukan Tahun Ini (<span id="current-year-display"></span>)</h3>
+                    <p id="metric-income-yearly" class="text-2xl font-semibold text-green-600 mt-2">Rp 0</p>
                 </div>
                 <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
                     <h3 class="text-sm font-medium text-slate-500">Okupansi Kamar</h3>
@@ -600,12 +608,22 @@
             const renderMetricsAndChart = () => {
                 let totalOverdueAmount = 0;
                 let totalPaidThisMonth = 0;
+                let totalPaidThisYear = 0;
+                let totalPaidOverall = 0;
 
+                // Calculate total paid this month
                 totalPaidThisMonth = payments.filter(p => {
                     return p.date.getMonth() === currentSelectedDate.getMonth() &&
-                           p.date.getFullYear() === currentSelectedDate.getFullYear();
+                        p.date.getFullYear() === currentSelectedDate.getFullYear();
                 }).reduce((sum, p) => sum + p.amount, 0);
 
+                // Calculate total paid this year
+                totalPaidThisYear = payments.filter(p => {
+                    return p.date.getFullYear() === currentSelectedDate.getFullYear();
+                }).reduce((sum, p) => sum + p.amount, 0);
+
+                // Calculate total paid overall
+                totalPaidOverall = payments.reduce((sum, p) => sum + p.amount, 0);
 
                 tenants.forEach(tenant => {
                     const statusData = getTenantPaymentStatus(tenant, currentSelectedDate);
@@ -613,9 +631,9 @@
                     if (statusData.status === 'not_yet_entered') {
                         return;
                     }
-                    
+
                     if (!statusData.isPaid && (statusData.status === 'overdue' || statusData.status === 'unpaid' || statusData.status === 'due_soon' || statusData.status === 'first_month_unpaid')) {
-                        totalOverdueAmount += tenant.rent; 
+                        totalOverdueAmount += tenant.rent;
                     }
                 });
 
@@ -624,7 +642,12 @@
                     return status !== 'not_yet_entered';
                 }).length;
 
-                document.getElementById('metric-income').textContent = formatCurrency(totalPaidThisMonth);
+                // Update metric displays
+                document.getElementById('current-month-name').textContent = monthNames[currentSelectedDate.getMonth()];
+                document.getElementById('metric-income-monthly').textContent = formatCurrency(totalPaidThisMonth);
+                document.getElementById('current-year-display').textContent = currentSelectedDate.getFullYear();
+                document.getElementById('metric-income-yearly').textContent = formatCurrency(totalPaidThisYear);
+                document.getElementById('metric-income-overall').textContent = formatCurrency(totalPaidOverall);
                 document.getElementById('metric-due').textContent = formatCurrency(totalOverdueAmount);
                 document.getElementById('metric-occupancy').textContent = `${activeTenantsCount} / ${tenants.length}`;
 
@@ -633,7 +656,7 @@
                 const relevantTenantsForChart = processedTenantsForChart.filter(t => t.status !== 'not_yet_entered');
 
                 const paidCount = relevantTenantsForChart.filter(t => t.isPaid).length;
-                const unpaidCount = relevantTenantsForChart.filter(t => !t.isPaid).length; 
+                const unpaidCount = relevantTenantsForChart.filter(t => !t.isPaid).length;
 
                 const ctx = document.getElementById('payment-chart').getContext('2d');
                 if (paymentChart) {
@@ -700,7 +723,7 @@
                     title = type === 'addTenant' ? "Tambah Penyewa Baru" : "Edit Data Penyewa";
                     const isEdit = type === 'editTenant';
                     const entryDateValue = isEdit && tenant.entryDate ? tenant.entryDate.toISOString().split('T')[0] : '';
-                    
+
                     content = `
                         <div class="space-y-4">
                             <div>
@@ -750,11 +773,11 @@
                     const today = new Date();
                     const currentStatus = getTenantPaymentStatus(tenant, currentSelectedDate);
                     const dueDateForDisplay = currentStatus.dueDate;
-                    
+
                     let periodTextForModal = 'N/A';
                     if (dueDateForDisplay) {
-                         let tempPeriodStart = new Date(dueDateForDisplay);
-                         let tempPeriodEnd = new Date(dueDateForDisplay);
+                        let tempPeriodStart = new Date(dueDateForDisplay);
+                        let tempPeriodEnd = new Date(dueDateForDisplay);
 
                         switch (tenant.paymentInterval) {
                             case 'monthly':
@@ -765,17 +788,17 @@
                             case 'quarterly':
                                 tempPeriodEnd = addMonths(tempPeriodEnd, 3);
                                 tempPeriodEnd.setDate(tempPeriodEnd.getDate() - 1);
-                                paymentPeriodTextForModal = `Sewa 3 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
+                                periodTextForModal = `Sewa 3 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
                                 break;
                             case 'biannually':
                                 tempPeriodEnd = addMonths(tempPeriodEnd, 6);
                                 tempPeriodEnd.setDate(tempPeriodEnd.getDate() - 1);
-                                paymentPeriodTextForModal = `Sewa 6 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
+                                periodTextForModal = `Sewa 6 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
                                 break;
                             case 'annually':
                                 tempPeriodEnd = addMonths(tempPeriodEnd, 12);
                                 tempPeriodEnd.setDate(tempPeriodEnd.getDate() - 1);
-                                paymentPeriodTextForModal = `Sewa Tahunan (Periode: Tahun ${tempPeriodStart.getFullYear()})`;
+                                periodTextForModal = `Sewa Tahunan (Periode: Tahun ${tempPeriodStart.getFullYear()})`;
                                 break;
                         }
                     }
@@ -834,7 +857,7 @@
                     modal.classList.remove('opacity-0');
                     modal.querySelector('.modal-content').classList.remove('scale-95');
                 }, 10);
-                
+
                 // Set default interval if adding new tenant, or pre-select for edit
                 if (type === 'addTenant') {
                     document.getElementById('paymentInterval').value = 'monthly';
@@ -950,16 +973,16 @@
                         tenants[tenantIndex].rent = rent;
                         tenants[tenantIndex].deposit = deposit;
                         tenants[tenantIndex].paymentInterval = paymentInterval;
-                        
+
                         // Important: If entryDate changes, you might need to re-evaluate lastPaidPeriodEnd
                         // For simplicity, if entryDate changes, reset lastPaidPeriodEnd to day before new entryDate
                         // or add more complex logic to check if existing payments still make sense.
                         // For now, let's just reset if the entryDate itself changed.
                         if (tenants[tenantIndex].entryDate.getTime() !== updatedEntryDate.getTime()) {
-                             let tempDate = new Date(updatedEntryDate);
-                             tempDate.setDate(tempDate.getDate() - 1);
-                             tenants[tenantIndex].lastPaidPeriodEnd = tempDate;
-                             tenants[tenantIndex].lastPaidPeriodEnd.setHours(23, 59, 59, 999);
+                            let tempDate = new Date(updatedEntryDate);
+                            tempDate.setDate(tempDate.getDate() - 1);
+                            tenants[tenantIndex].lastPaidPeriodEnd = tempDate;
+                            tenants[tenantIndex].lastPaidPeriodEnd.setHours(23, 59, 59, 999);
                         }
 
 
@@ -986,13 +1009,21 @@
 
                     if (!isNaN(paymentAmount) && paymentDateStr) {
                         let newLastPaidPeriodEnd = new Date(tenant.lastPaidPeriodEnd);
-                        
+
                         let monthsToAdd = 0;
                         switch (tenant.paymentInterval) {
-                            case 'monthly': monthsToAdd = 1; break;
-                            case 'quarterly': monthsToAdd = 3; break;
-                            case 'biannually': monthsToAdd = 6; break;
-                            case 'annually': monthsToAdd = 12; break;
+                            case 'monthly':
+                                monthsToAdd = 1;
+                                break;
+                            case 'quarterly':
+                                monthsToAdd = 3;
+                                break;
+                            case 'biannually':
+                                monthsToAdd = 6;
+                                break;
+                            case 'annually':
+                                monthsToAdd = 12;
+                                break;
                         }
                         newLastPaidPeriodEnd = addMonths(newLastPaidPeriodEnd, monthsToAdd);
                         newLastPaidPeriodEnd.setHours(23, 59, 59, 999);
@@ -1006,7 +1037,7 @@
                         });
 
                         tenant.lastPaidPeriodEnd = newLastPaidPeriodEnd;
-                        
+
                         saveData();
                         updateAll();
                         closeModal();
