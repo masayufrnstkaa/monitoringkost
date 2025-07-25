@@ -59,16 +59,17 @@
                     <p id="metric-due" class="text-2xl font-semibold text-amber-600 mt-2">Rp 0</p>
                 </div>
                 <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                    <h3 class="text-sm font-medium text-slate-500">Okupansi Kamar</h3>
+                    <p id="metric-occupancy" class="text-2xl font-semibold text-slate-800 mt-2">0 / 0</p>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
                     <h3 class="text-sm font-medium text-slate-500">Total Pemasukan Keseluruhan</h3>
                     <p id="metric-income-overall" class="text-2xl font-semibold text-blue-600 mt-2">Rp 0</p>
                 </div>
                 <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
                     <h3 class="text-sm font-medium text-slate-500">Pemasukan Tahun Ini (<span id="current-year-display"></span>)</h3>
                     <p id="metric-income-yearly" class="text-2xl font-semibold text-green-600 mt-2">Rp 0</p>
-                </div>
-                <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
-                    <h3 class="text-sm font-medium text-slate-500">Okupansi Kamar</h3>
-                    <p id="metric-occupancy" class="text-2xl font-semibold text-slate-800 mt-2">0 / 0</p>
                 </div>
             </section>
 
@@ -97,6 +98,7 @@
                             <thead class="text-xs text-slate-700 uppercase bg-stone-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">Penyewa</th>
+                                    <th scope="col" class="px-6 py-3">Tanggal Masuk</th>
                                     <th scope="col" class="px-6 py-3">Deposit</th>
                                     <th scope="col" class="px-6 py-3">Interval</th>
                                     <th scope="col" class="px-6 py-3">Jatuh Tempo</th>
@@ -389,7 +391,7 @@
                             'Nama Penyewa',
                             'No. Kamar',
                             'No. WA',
-                            'Tanggal Masuk',
+                            'Tanggal Masuk', // Added to Excel export
                             'Harga Sewa (Rp)',
                             'Uang Deposit (Rp)',
                             'Interval Pembayaran',
@@ -581,7 +583,7 @@
                                 ${tenant.name}
                                 <div class="text-xs text-slate-500">Kamar ${tenant.room}</div>
                             </td>
-                            <td class="px-6 py-4">${formatCurrency(tenant.deposit)}</td>
+                            <td class="px-6 py-4">${new Date(tenant.entryDate).toLocaleDateString('id-ID')}</td> <td class="px-6 py-4">${formatCurrency(tenant.deposit)}</td>
                             <td class="px-6 py-4">${paymentIntervalLabels[tenant.paymentInterval]}</td>
                             <td class="px-6 py-4">${dueDateDisplay}</td>
                             <td class="px-6 py-4">
@@ -855,12 +857,14 @@
                 setTimeout(() => {
                     const modal = document.getElementById('modal');
                     modal.classList.remove('opacity-0');
-                    modal.querySelector('.modal-content').classList.remove('scale-95');
+                    modal.querySelector('.modal-content').classList.add('scale-95');
                 }, 10);
 
                 // Set default interval if adding new tenant, or pre-select for edit
                 if (type === 'addTenant') {
                     document.getElementById('paymentInterval').value = 'monthly';
+                    // Set default entryDate to today when adding new tenant
+                    document.getElementById('entryDate').valueAsDate = new Date();
                 }
             };
 
@@ -934,9 +938,11 @@
                             rent: rent,
                             deposit: deposit,
                             paymentInterval: paymentInterval,
+                            // Set lastPaidPeriodEnd to the day *before* entryDate
+                            // This means the first payment is for the period starting on entryDate.
                             lastPaidPeriodEnd: new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate() - 1)
                         };
-                        newTenant.lastPaidPeriodEnd.setHours(23, 59, 59, 999);
+                        newTenant.lastPaidPeriodEnd.setHours(23, 59, 59, 999); // Ensure end of day
 
                         tenants.push(newTenant);
                         saveData();
@@ -969,20 +975,22 @@
                         tenants[tenantIndex].name = name;
                         tenants[tenantIndex].room = room;
                         tenants[tenantIndex].phone = phone;
+                        const oldEntryDate = tenants[tenantIndex].entryDate; // Keep old entry date for comparison
                         tenants[tenantIndex].entryDate = updatedEntryDate;
                         tenants[tenantIndex].rent = rent;
                         tenants[tenantIndex].deposit = deposit;
                         tenants[tenantIndex].paymentInterval = paymentInterval;
 
-                        // Important: If entryDate changes, you might need to re-evaluate lastPaidPeriodEnd
-                        // For simplicity, if entryDate changes, reset lastPaidPeriodEnd to day before new entryDate
-                        // or add more complex logic to check if existing payments still make sense.
-                        // For now, let's just reset if the entryDate itself changed.
-                        if (tenants[tenantIndex].entryDate.getTime() !== updatedEntryDate.getTime()) {
-                            let tempDate = new Date(updatedEntryDate);
-                            tempDate.setDate(tempDate.getDate() - 1);
-                            tenants[tenantIndex].lastPaidPeriodEnd = tempDate;
-                            tenants[tenantIndex].lastPaidPeriodEnd.setHours(23, 59, 59, 999);
+                        // IMPORTANT: If entryDate or paymentInterval changes, re-evaluate lastPaidPeriodEnd
+                        // We need to decide what happens if entryDate changes for a tenant with existing payments.
+                        // A simple approach is to reset lastPaidPeriodEnd to the day before the *new* entryDate
+                        // if the entryDate actually changed. This assumes previous payments are invalidated.
+                        // For a more robust solution, you might need to adjust payments history.
+                        if (oldEntryDate.getTime() !== updatedEntryDate.getTime()) {
+                             let tempDate = new Date(updatedEntryDate);
+                             tempDate.setDate(tempDate.getDate() - 1);
+                             tenants[tenantIndex].lastPaidPeriodEnd = tempDate;
+                             tenants[tenantIndex].lastPaidPeriodEnd.setHours(23, 59, 59, 999);
                         }
 
 
