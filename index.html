@@ -147,6 +147,7 @@
 
                     const paymentIntervalLabels = {
                         "monthly": "Bulanan",
+                        "bimonthly": "2 Bulanan", // Ditambahkan: 2 Bulanan
                         "quarterly": "3 Bulanan",
                         "biannually": "6 Bulanan",
                         "annually": "Tahunan"
@@ -154,6 +155,7 @@
 
                     const intervalToMonths = {
                         "monthly": 1,
+                        "bimonthly": 2, // Ditambahkan: 2 Bulanan = 2 bulan
                         "quarterly": 3,
                         "biannually": 6,
                         "annually": 12
@@ -561,6 +563,11 @@
                                                     periodEnd.setDate(periodEnd.getDate() - 1);
                                                     paymentPeriodText = `untuk bulan ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(periodStart)}`;
                                                     break;
+                                                case 'bimonthly': // Ditambahkan: Case untuk 2 bulanan
+                                                    periodEnd = addMonths(periodEnd, 2);
+                                                    periodEnd.setDate(periodEnd.getDate() - 1);
+                                                    paymentPeriodText = `untuk 2 bulanan ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(periodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(periodEnd)}`;
+                                                    break;
                                                 case 'quarterly':
                                                     periodEnd = addMonths(periodEnd, 3);
                                                     periodEnd.setDate(periodEnd.getDate() - 1);
@@ -815,7 +822,7 @@
                                 <label for="paymentInterval" class="block text-sm font-medium text-slate-700">Interval Pembayaran</label>
                                 <select id="paymentInterval" class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                                     <option value="monthly" ${isEdit && tenant.paymentInterval === 'monthly' ? 'selected' : ''}>Bulanan</option>
-                                    <option value="quarterly" ${isEdit && tenant.paymentInterval === 'quarterly' ? 'selected' : ''}>3 Bulanan</option>
+                                    <option value="bimonthly" ${isEdit && tenant.paymentInterval === 'bimonthly' ? 'selected' : ''}>2 Bulanan</option> <option value="quarterly" ${isEdit && tenant.paymentInterval === 'quarterly' ? 'selected' : ''}>3 Bulanan</option>
                                     <option value="biannually" ${isEdit && tenant.paymentInterval === 'biannually' ? 'selected' : ''}>6 Bulanan</option>
                                     <option value="annually" ${isEdit && tenant.paymentInterval === 'annually' ? 'selected' : ''}>Tahunan</option>
                                 </select>
@@ -851,6 +858,9 @@
                         switch (tenant.paymentInterval) {
                             case 'monthly':
                                 periodTextForModal = `Sewa Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodStart)})`;
+                                break;
+                            case 'bimonthly': // Ditambahkan: Case untuk 2 bulanan
+                                periodTextForModal = `Sewa 2 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
                                 break;
                             case 'quarterly':
                                 periodTextForModal = `Sewa 3 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
