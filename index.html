@@ -227,12 +227,19 @@
                     const formatCurrency = (amount) => `Rp ${new Intl.NumberFormat('id-ID').format(amount)}`;
 
                     // Helper to add months while handling month-end issues (e.g., Jan 31 + 1 month -> Feb 28/29)
+                    // This version now explicitly sets the day to the original day if possible.
                     const addMonths = (date, months) => {
                         const d = new Date(date);
-                        const day = d.getDate();
+                        const originalDay = d.getDate();
                         d.setMonth(d.getMonth() + months);
-                        if (d.getDate() !== day) { // If the day changed, it means it overflowed
-                            d.setDate(0); // Set to the last day of the *previous* month (which is the target month's end)
+
+                        // If setting the month overflowed (e.g., Jan 31 + 1 month became March 2, then Feb 29 for leap year)
+                        // it would automatically adjust to the last day of the target month.
+                        // We want to retain the original day if it's valid in the new month,
+                        // or fall back to the last day of the new month if the original day doesn't exist.
+                        if (d.getDate() !== originalDay) {
+                            const lastDayOfTargetMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                            d.setDate(Math.min(originalDay, lastDayOfTargetMonth));
                         }
                         return d;
                     };
@@ -251,9 +258,8 @@
                     // This is the start date of the period for which the next payment is due.
                     const getExpectedDueDate = (tenant) => {
                         // The due date is the day after the last paid period ends.
-                        // We add 1 day to `lastPaidPeriodEnd` to get the start of the next period.
                         let nextPeriodStartDate = new Date(tenant.lastPaidPeriodEnd);
-                        nextPeriodStartDate.setDate(nextPeriodStartDate.getDate() + 1);
+                        nextPeriodStartDate.setDate(nextPeriodStartDate.getDate() + 1); // Move to the day after last paid period ends
                         nextPeriodStartDate.setHours(0, 0, 0, 0); // Normalize to start of day
 
                         return nextPeriodStartDate;
@@ -298,17 +304,25 @@
                         }
 
                         // Calculate the specific due date for the payment period that *includes* or *is next after* the selected month
-                        // Start with `tenant.entryDate` and advance it by intervals until it's >= `startOfSelectedMonth`.
-                        let calculatedDueDate = new Date(tenant.lastPaidPeriodEnd); // Start from last paid end date
-                        calculatedDueDate.setDate(calculatedDueDate.getDate() + 1); // Move to the day after last paid period ends
+                        // Start from the day after the last paid period ended
+                        let calculatedDueDate = new Date(tenant.lastPaidPeriodEnd);
+                        calculatedDueDate.setDate(calculatedDueDate.getDate() + 1);
                         calculatedDueDate.setHours(0, 0, 0, 0);
 
-                        // If the initial calculatedDueDate (based on lastPaidPeriodEnd) is before the current view month,
-                        // we need to advance it to find the *relevant* due date for this view period.
+                        // Advance calculatedDueDate until it's in or after the currentSelectedDate's month
+                        // while ensuring the day of the month matches the entry date's day for consistency.
                         let tempPeriodsAdvanced = 0;
+                        const originalEntryDay = entryDate.getDate();
+
                         while (calculatedDueDate < startOfSelectedMonth && tempPeriodsAdvanced < 24) { // Limit to avoid infinite loops
-                            let monthsToAdd = intervalToMonths[tenant.paymentInterval];
-                            calculatedDueDate = addMonths(calculatedDueDate, monthsToAdd);
+                            calculatedDueDate = addMonths(calculatedDueDate, intervalToMonths[tenant.paymentInterval]);
+                            // If the current date does not match the original entry day, adjust it.
+                            // This handles month-end rollovers while keeping the payment day consistent.
+                            if (calculatedDueDate.getDate() !== originalEntryDay) {
+                                const lastDayOfCalculatedMonth = new Date(calculatedDueDate.getFullYear(), calculatedDueDate.getMonth() + 1, 0).getDate();
+                                calculatedDueDate.setDate(Math.min(originalEntryDay, lastDayOfCalculatedMonth));
+                            }
+                            calculatedDueDate.setHours(0, 0, 0, 0);
                             tempPeriodsAdvanced++;
                         }
 
@@ -318,7 +332,6 @@
                         // A tenant is paid for the current selected month if their `lastPaidPeriodEnd`
                         // covers the `selectedDate`.
                         isPaidForCurrentPeriod = tenant.lastPaidPeriodEnd && tenant.lastPaidPeriodEnd >= endOfSelectedMonth;
-
 
                         const diffTime = dueDate.getTime() - today.getTime();
                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -617,77 +630,69 @@
 
             const renderMetricsAndChart = () => {
                 let totalOverdueAmount = 0;
-                let totalPaidThisMonth = 0;
-                let totalPaidThisYear = 0;
-                let totalPaidOverall = 0; // This remains a direct sum of all payments
+                let totalAccruedIncomeMonthly = 0; // Pemasukan berdasarkan periode yang dicakup per bulan
+                let totalAccruedIncomeYearly = 0; // Pemasukan berdasarkan periode yang dicakup per tahun
+                let totalCashReceivedOverall = 0; // Pemasukan total dari semua pembayaran (cash basis)
 
-                const currentMonthStart = new Date(currentSelectedDate.getFullYear(), currentSelectedDate.getMonth(), 1);
-                currentMonthStart.setHours(0, 0, 0, 0);
-                const currentMonthEnd = new Date(currentSelectedDate.getFullYear(), currentSelectedDate.getMonth() + 1, 0);
-                currentMonthEnd.setHours(23, 59, 59, 999);
-
-                const currentYearStart = new Date(currentSelectedDate.getFullYear(), 0, 1);
-                currentYearStart.setHours(0, 0, 0, 0);
-                const currentYearEnd = new Date(currentSelectedDate.getFullYear(), 11, 31);
-                currentYearEnd.setHours(23, 59, 59, 999);
-
+                const currentYear = currentSelectedDate.getFullYear();
+                const currentMonth = currentSelectedDate.getMonth();
 
                 payments.forEach(p => {
                     const tenant = tenants.find(t => t.id === p.tenantId);
                     if (!tenant) return; // Skip if tenant not found (e.g., deleted tenant's payment)
 
-                    let monthsInPaymentInterval = intervalToMonths[p.paidForInterval] || 1; // Use the actual interval of *this specific payment*
+                    // Total pemasukan keseluruhan (cash basis)
+                    totalCashReceivedOverall += p.amount;
 
-                    // Calculate the rent per month for this payment
-                    const rentPerMonth = p.amount / monthsInPaymentInterval;
+                    // Tentukan berapa bulan yang dicakup oleh pembayaran ini
+                    const monthsCovered = intervalToMonths[p.paidForInterval] || 1;
+                    const amountPerMonth = p.amount / monthsCovered;
 
-                    // Calculate the start and end date of the period THIS specific payment covers
-                    // p.periodEndCovered is the end date.
-                    let paymentPeriodEndCovered = new Date(p.periodEndCovered);
-                    paymentPeriodEndCovered.setHours(23, 59, 59, 999); // Ensure end of day
+                    // Tentukan tanggal awal dan akhir dari periode yang dicakup pembayaran ini
+                    const paymentPeriodEnd = new Date(p.periodEndCovered);
+                    paymentPeriodEnd.setHours(23, 59, 59, 999);
 
-                    let paymentPeriodStartCovered = addMonths(new Date(paymentPeriodEndCovered), -monthsInPaymentInterval);
-                    paymentPeriodStartCovered.setDate(paymentPeriodStartCovered.getDate() + 1); // +1 day to get the actual start date
-                    paymentPeriodStartCovered.setHours(0,0,0,0);
+                    // The simplest way to get the start date of the covered period:
+                    // Take the day of the lastPaidPeriodEnd, subtract monthsCovered months, then add 1 day.
+                    let tempStart = new Date(p.periodEndCovered);
+                    tempStart = addMonths(tempStart, -monthsCovered);
+                    tempStart.setDate(tempStart.getDate() + 1); // Move to the first day of the period
 
+                    let tempEnd = new Date(p.periodEndCovered);
 
-                    // Add to total overall income (this is always direct sum of cash received)
-                    totalPaidOverall += p.amount;
-
-                    // Distribute income for the current month and year based on covered period
-                    let tempMonthWalker = new Date(paymentPeriodStartCovered); // Start walking from the beginning of the period this payment covers
-                    while (tempMonthWalker <= paymentPeriodEndCovered) {
-
-                        // Check if this month (tempMonthWalker) falls within the currently selected display month for the dashboard
-                        if (tempMonthWalker.getFullYear() === currentSelectedDate.getFullYear() &&
-                            tempMonthWalker.getMonth() === currentSelectedDate.getMonth()) {
-                            totalPaidThisMonth += rentPerMonth;
+                    // Distribusikan pendapatan ke setiap bulan dalam periode yang dicakup
+                    let currentIterationDate = new Date(tempStart);
+                    while (currentIterationDate <= tempEnd) {
+                        if (currentIterationDate.getFullYear() === currentYear &&
+                            currentIterationDate.getMonth() === currentMonth) {
+                            totalAccruedIncomeMonthly += amountPerMonth;
                         }
 
-                        // Check if this month (tempMonthWalker) falls within the currently selected display year for the dashboard
-                        if (tempMonthWalker.getFullYear() === currentSelectedDate.getFullYear()) {
-                            totalPaidThisYear += rentPerMonth;
+                        if (currentIterationDate.getFullYear() === currentYear) {
+                            totalAccruedIncomeYearly += amountPerMonth;
                         }
 
-                        // Move to the beginning of the next month
-                        tempMonthWalker = addMonths(tempMonthWalker, 1);
-                        tempMonthWalker.setDate(1); // Crucially set to the 1st of the month for consistent month-by-month checks
+                        // Pindah ke bulan berikutnya
+                        currentIterationDate = addMonths(currentIterationDate, 1);
+                        currentIterationDate.setDate(1); // Pastikan ini awal bulan untuk iterasi konsisten
                     }
                 });
 
-                // Re-calculate total overdue amount based on current status of tenants
+                // Fungsi helper untuk mendapatkan jumlah hari dalam sebulan
+                function getDaysInMonth(year, month) {
+                    return new Date(year, month + 1, 0).getDate();
+                }
+
+                // Recalculate total overdue amount based on current status of tenants
                 totalOverdueAmount = 0;
                 tenants.forEach(tenant => {
                     const statusData = getTenantPaymentStatus(tenant, currentSelectedDate);
-                    // Only add to overdue if the tenant is actually due/overdue for the *current selected month's period*
-                    // and not yet paid for that specific period.
                     if (!statusData.isPaid && statusData.status !== 'not_yet_entered') {
                         // The 'rent' here is the amount for *one interval* (e.g., 3 months for quarterly).
                         // If the tenant is overdue, we want to show the full amount due for that interval.
                         totalOverdueAmount += tenant.rent;
                     }
                 });
-
 
                 const activeTenantsCount = tenants.filter(t => {
                     const status = getTenantPaymentStatus(t, currentSelectedDate).status;
@@ -697,10 +702,10 @@
                 // Update metric displays
                 document.getElementById('current-month-name').textContent = monthNames[currentSelectedDate.getMonth()];
                 // Round to nearest integer for display, as distributing can result in decimals
-                document.getElementById('metric-income-monthly').textContent = formatCurrency(Math.round(totalPaidThisMonth));
+                document.getElementById('metric-income-monthly').textContent = formatCurrency(Math.round(totalAccruedIncomeMonthly));
                 document.getElementById('current-year-display').textContent = currentSelectedDate.getFullYear();
-                document.getElementById('metric-income-yearly').textContent = formatCurrency(Math.round(totalPaidThisYear));
-                document.getElementById('metric-income-overall').textContent = formatCurrency(totalPaidOverall);
+                document.getElementById('metric-income-yearly').textContent = formatCurrency(Math.round(totalAccruedIncomeYearly));
+                document.getElementById('metric-income-overall').textContent = formatCurrency(totalCashReceivedOverall);
                 document.getElementById('metric-due').textContent = formatCurrency(totalOverdueAmount);
                 document.getElementById('metric-occupancy').textContent = `${activeTenantsCount} / ${tenants.length}`;
 
@@ -776,6 +781,9 @@
                     title = type === 'addTenant' ? "Tambah Penyewa Baru" : "Edit Data Penyewa";
                     const isEdit = type === 'editTenant';
                     const entryDateValue = isEdit && tenant.entryDate ? tenant.entryDate.toISOString().split('T')[0] : '';
+                    // Display rent per month in the input field
+                    const rentPerMonthValue = isEdit ? (tenant.rent / (intervalToMonths[tenant.paymentInterval] || 1)) : '';
+
 
                     content = `
                         <div class="space-y-4">
@@ -799,8 +807,8 @@
                                     <input type="date" id="entryDate" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500" value="${entryDateValue}">
                                 </div>
                                 <div>
-                                    <label for="rent" class="block text-sm font-medium text-slate-700">Harga Sewa (Rp / interval)</label>
-                                    <input type="number" id="rent" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500" value="${isEdit ? tenant.rent : ''}">
+                                    <label for="rent_per_month_input" class="block text-sm font-medium text-slate-700">Harga Sewa per Bulan (Rp)</label>
+                                    <input type="number" id="rent_per_month_input" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500" value="${rentPerMonthValue}">
                                 </div>
                             </div>
                             <div>
@@ -828,13 +836,17 @@
                     const dueDateForDisplay = currentStatus.dueDate;
 
                     let periodTextForModal = 'N/A';
+                    let amountToPay = tenant.rent; // Default to the interval rent
+
                     if (dueDateForDisplay) {
                         let tempPeriodStart = new Date(dueDateForDisplay);
                         let tempPeriodEnd = new Date(dueDateForDisplay);
 
                         let monthsInIntervalForPeriodText = intervalToMonths[tenant.paymentInterval];
+                        // Calculate the end of the period being paid for.
+                        // This uses `addMonths` then subtracts 1 day to get the last day of the final month in the period.
                         tempPeriodEnd = addMonths(tempPeriodStart, monthsInIntervalForPeriodText);
-                        tempPeriodEnd.setDate(tempPeriodEnd.getDate() - 1); // End of the period
+                        tempPeriodEnd.setDate(tempPeriodEnd.getDate() - 1); // Get the last day of the covered period
 
                         switch (tenant.paymentInterval) {
                             case 'monthly':
@@ -864,7 +876,7 @@
                             </div>
                             <div>
                                 <label for="payment_amount" class="block text-sm font-medium text-slate-700">Jumlah Bayar (Rp)</label>
-                                <input type="number" id="payment_amount" value="${tenant.rent}" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                <input type="number" id="payment_amount" value="${amountToPay}" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                             </div>
                             <div>
                                 <label for="payment_date" class="block text-sm font-medium text-slate-700">Tanggal Pembayaran</label>
@@ -911,6 +923,11 @@
                 if (type === 'addTenant') {
                     document.getElementById('paymentInterval').value = 'monthly';
                     document.getElementById('entryDate').valueAsDate = new Date();
+                    document.getElementById('rent_per_month_input').addEventListener('input', updateRentBasedOnInterval);
+                    document.getElementById('paymentInterval').addEventListener('change', updateRentBasedOnInterval);
+                } else if (type === 'editTenant') {
+                    document.getElementById('rent_per_month_input').addEventListener('input', updateRentBasedOnInterval);
+                    document.getElementById('paymentInterval').addEventListener('change', updateRentBasedOnInterval);
                 }
             };
 
@@ -922,6 +939,20 @@
                     setTimeout(() => {
                         document.getElementById('modal-container').innerHTML = '';
                     }, 300);
+                }
+            };
+
+            // New function to update rent input based on interval and monthly rent
+            const updateRentBasedOnInterval = () => {
+                const rentPerMonthInput = document.getElementById('rent_per_month_input');
+                const paymentIntervalSelect = document.getElementById('paymentInterval');
+                const monthlyRent = parseFloat(rentPerMonthInput.value);
+                const interval = paymentIntervalSelect.value;
+                const months = intervalToMonths[interval] || 1;
+
+                if (!isNaN(monthlyRent)) {
+                    // Update a hidden field or a data attribute if you need to store the "total rent per interval"
+                    // For now, we'll rely on calculating it during save.
                 }
             };
 
@@ -967,11 +998,14 @@
                     const room = document.getElementById('room').value;
                     const phone = document.getElementById('phone').value;
                     const entryDateStr = document.getElementById('entryDate').value;
-                    const rent = parseFloat(document.getElementById('rent').value);
+                    const rentPerMonthInput = parseFloat(document.getElementById('rent_per_month_input').value); // Get rent per month
                     const deposit = parseFloat(document.getElementById('deposit').value) || 0;
                     const paymentInterval = document.getElementById('paymentInterval').value;
 
-                    if (name && room && phone && entryDateStr && !isNaN(rent) && paymentInterval) {
+                    // Calculate total rent for the interval
+                    const rent = rentPerMonthInput * (intervalToMonths[paymentInterval] || 1);
+
+                    if (name && room && phone && entryDateStr && !isNaN(rentPerMonthInput) && paymentInterval) {
                         const entryDate = new Date(entryDateStr);
                         entryDate.setHours(0, 0, 0, 0);
 
@@ -989,7 +1023,7 @@
                             room: room,
                             phone: phone,
                             entryDate: entryDate,
-                            rent: rent,
+                            rent: rent, // Store the total rent for the interval
                             deposit: deposit,
                             paymentInterval: paymentInterval,
                             lastPaidPeriodEnd: initialLastPaidPeriodEnd
@@ -1000,7 +1034,7 @@
                         updateAll();
                         closeModal();
                     } else {
-                        alert("Harap isi semua kolom wajib (Nama, Kamar, No. WA, Tanggal Masuk, Harga Sewa, Interval Pembayaran) dengan benar.");
+                        alert("Harap isi semua kolom wajib (Nama, Kamar, No. WA, Tanggal Masuk, Harga Sewa per Bulan, Interval Pembayaran) dengan benar.");
                     }
                 } else if (btnId === 'update-tenant-btn') { // Handle update tenant button
                     const tenantId = parseInt(e.target.dataset.id);
@@ -1014,11 +1048,15 @@
                     const room = document.getElementById('room').value;
                     const phone = document.getElementById('phone').value;
                     const entryDateStr = document.getElementById('entryDate').value;
-                    const rent = parseFloat(document.getElementById('rent').value);
+                    const rentPerMonthInput = parseFloat(document.getElementById('rent_per_month_input').value); // Get rent per month
                     const deposit = parseFloat(document.getElementById('deposit').value) || 0;
                     const paymentInterval = document.getElementById('paymentInterval').value;
 
-                    if (name && room && phone && entryDateStr && !isNaN(rent) && paymentInterval) {
+                    // Calculate total rent for the interval
+                    const rent = rentPerMonthInput * (intervalToMonths[paymentInterval] || 1);
+
+
+                    if (name && room && phone && entryDateStr && !isNaN(rentPerMonthInput) && paymentInterval) {
                         const updatedEntryDate = new Date(entryDateStr);
                         updatedEntryDate.setHours(0, 0, 0, 0);
 
@@ -1030,7 +1068,7 @@
                         const oldPaymentInterval = tenants[tenantIndex].paymentInterval;
 
                         tenants[tenantIndex].entryDate = updatedEntryDate;
-                        tenants[tenantIndex].rent = rent;
+                        tenants[tenantIndex].rent = rent; // Update with total rent for the interval
                         tenants[tenantIndex].deposit = deposit;
                         tenants[tenantIndex].paymentInterval = paymentInterval;
 
@@ -1038,19 +1076,19 @@
                         // This logic assumes that if you change entryDate or interval,
                         // you want to reset the "paid until" date based on the new entry/interval.
                         if (oldEntryDate.getTime() !== updatedEntryDate.getTime() || oldPaymentInterval !== paymentInterval) {
-                             let monthsToAdvance = intervalToMonths[paymentInterval];
-                             let newCalculatedLastPaidPeriodEnd = addMonths(new Date(updatedEntryDate), monthsToAdvance);
-                             newCalculatedLastPaidPeriodEnd.setDate(newCalculatedLastPaidPeriodEnd.getDate() - 1);
-                             newCalculatedLastPaidPeriodEnd.setHours(23, 59, 59, 999);
+                            let monthsToAdvance = intervalToMonths[paymentInterval];
+                            let newCalculatedLastPaidPeriodEnd = addMonths(new Date(updatedEntryDate), monthsToAdvance);
+                            newCalculatedLastPaidPeriodEnd.setDate(newCalculatedLastPaidPeriodEnd.getDate() - 1);
+                            newCalculatedLastPaidPeriodEnd.setHours(23, 59, 59, 999);
 
-                             tenants[tenantIndex].lastPaidPeriodEnd = newCalculatedLastPaidPeriodEnd;
+                            tenants[tenantIndex].lastPaidPeriodEnd = newCalculatedLastPaidPeriodEnd;
                         }
 
                         saveData();
                         updateAll();
                         closeModal();
                     } else {
-                        alert("Harap isi semua kolom wajib (Nama, Kamar, No. WA, Tanggal Masuk, Harga Sewa, Interval Pembayaran) dengan benar.");
+                        alert("Harap isi semua kolom wajib (Nama, Kamar, No. WA, Tanggal Masuk, Harga Sewa per Bulan, Interval Pembayaran) dengan benar.");
                     }
 
                 } else if (btnId === 'save-payment-btn') {
@@ -1068,27 +1106,36 @@
                     paymentDate.setHours(0, 0, 0, 0);
 
                     if (!isNaN(paymentAmount) && paymentDateStr) {
-                        let newLastPaidPeriodEnd = new Date(tenant.lastPaidPeriodEnd);
-
-                        let monthsToAdd = intervalToMonths[tenant.paymentInterval];
-                        newLastPaidPeriodEnd = addMonths(newLastPaidPeriodEnd, monthsToAdd);
-                        // No need to subtract 1 day here, as addMonths will roll to the next month,
-                        // and we want periodEndCovered to be the *end* of the period, not the day before.
-                        // However, the previous logic implies `lastPaidPeriodEnd` is the end date, so keep it consistent.
-                        // If current `lastPaidPeriodEnd` is end of a period, adding `monthsToAdd` and then subtracting 1 day
-                        // will move it to the end of the *new* period.
-                        newLastPaidPeriodEnd.setDate(newLastPaidPeriodEnd.getDate() -1); // Adjust to the end of the month *before* the next period starts
+                        // Calculate the new lastPaidPeriodEnd based on the *current* lastPaidPeriodEnd
+                        // This ensures continuous payment tracking.
+                        let newLastPaidPeriodEnd = addMonths(new Date(tenant.lastPaidPeriodEnd), intervalToMonths[tenant.paymentInterval]);
+                        // Now, adjust it to be the true end of the month for the last covered month.
+                        // The addMonths helper already handles day rollovers, so this should be more accurate.
+                        newLastPaidPeriodEnd.setDate(newLastPaidPeriodEnd.getDate()); // Keep the same day, no -1. This was an error in original logic
                         newLastPaidPeriodEnd.setHours(23, 59, 59, 999);
+
+                        // To correctly advance to the *next* period's end, we should add months from the *entryDate* or *last paid period start*.
+                        // Let's re-think how `newLastPaidPeriodEnd` is calculated.
+                        // The `lastPaidPeriodEnd` already signifies the end of the *last successfully paid period*.
+                        // So, the next payment should cover the period starting the day *after* `lastPaidPeriodEnd`.
+                        // The period *ends* after `intervalToMonths` added to that start date.
+
+                        let newPeriodStartDate = new Date(tenant.lastPaidPeriodEnd);
+                        newPeriodStartDate.setDate(newPeriodStartDate.getDate() + 1); // Start of the *next* period to be paid
+
+                        let calculatedNewLastPaidPeriodEnd = addMonths(newPeriodStartDate, intervalToMonths[tenant.paymentInterval]);
+                        calculatedNewLastPaidPeriodEnd.setDate(calculatedNewLastPaidPeriodEnd.getDate() - 1); // End of the *newly paid* period
+                        calculatedNewLastPaidPeriodEnd.setHours(23, 59, 59, 999);
 
                         payments.push({
                             tenantId: tenantId,
-                            periodEndCovered: newLastPaidPeriodEnd, // This is the end date of the period this payment covers
+                            periodEndCovered: calculatedNewLastPaidPeriodEnd, // This is the end date of the period this payment covers
                             amount: paymentAmount,
                             date: paymentDate,
                             paidForInterval: tenant.paymentInterval
                         });
 
-                        tenant.lastPaidPeriodEnd = newLastPaidPeriodEnd; // Update tenant's last paid period end
+                        tenant.lastPaidPeriodEnd = calculatedNewLastPaidPeriodEnd; // Update tenant's last paid period end
 
                         saveData();
                         updateAll();
