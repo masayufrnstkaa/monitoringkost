@@ -393,18 +393,27 @@
                         };
                     };
 
-                    // --- FUNGSI UNDUH EXCEL ---
+                    // --- FUNGSI UNDUH EXCEL YANG TELAH DIPERBARUI ---
                     const downloadExcel = () => {
+                        // Salin dan urutkan array tenants berdasarkan nomor kamar (room).
+                        // Kami menggunakan sort() dengan perbandingan numerik.
+                        const sortedTenants = [...tenants].sort((a, b) => {
+                            // Asumsi 'room' adalah string angka, jadi perlu diubah ke integer
+                            const roomA = parseInt(a.room);
+                            const roomB = parseInt(b.room);
+                            return roomA - roomB;
+                        });
+
                         const dataToDownload = [];
 
-                        // Add header row
+                        // Tambahkan baris header
                         dataToDownload.push([
                             'Nama Penyewa',
                             'No. Kamar',
                             'No. WA',
                             'Tanggal Masuk',
-                            'Harga Sewa (Rp / Interval)', // Original rent
-                            'Harga per Bulan (Rp)', // New column for Excel
+                            'Harga Sewa (Rp / Interval)',
+                            'Harga per Bulan (Rp)',
                             'Uang Deposit (Rp)',
                             'Interval Pembayaran',
                             `Status Pembayaran (${monthNames[currentSelectedDate.getMonth()]} ${currentSelectedDate.getFullYear()})`,
@@ -412,19 +421,20 @@
                             'Tanggal Akhir Periode Terakhir Dibayar'
                         ]);
 
-                        // Add tenant data
-                        tenants.forEach(tenant => {
+                        // Tambahkan data penghuni yang sudah diurutkan
+                        sortedTenants.forEach(tenant => {
                             const statusData = getTenantPaymentStatus(tenant, currentSelectedDate);
                             const monthsInInterval = intervalToMonths[tenant.paymentInterval] || 1;
                             const rentPerMonth = tenant.rent / monthsInInterval;
 
+                            // Gunakan `tenant.phone` langsung untuk memastikan formatnya sesuai input
                             dataToDownload.push([
                                 tenant.name,
                                 tenant.room,
-                                tenant.phone,
+                                `'${tenant.phone}`, // Tambahkan apostrof di depan untuk menghindari Excel mengubahnya menjadi format angka
                                 new Date(tenant.entryDate).toLocaleDateString('id-ID'),
                                 tenant.rent,
-                                Math.round(rentPerMonth), // Rounded for display in Excel
+                                Math.round(rentPerMonth),
                                 tenant.deposit,
                                 paymentIntervalLabels[tenant.paymentInterval],
                                 statusData.statusText,
@@ -433,15 +443,11 @@
                             ]);
                         });
 
-                        let csvContent = dataToDownload.map(e => e.join(",")).join("\n");
-                        const blob = new Blob([csvContent], {
-                            type: 'text/csv;charset=utf-8;'
-                        });
+                        let csvContent = "data:text/csv;charset=utf-8," + dataToDownload.map(e => e.join(",")).join("\n");
+                        const encodedUri = encodeURI(csvContent);
                         const link = document.createElement("a");
-                        const url = URL.createObjectURL(blob);
-                        link.setAttribute("href", url);
+                        link.setAttribute("href", encodedUri);
                         link.setAttribute("download", `data_penyewa_kos_${monthNames[currentSelectedDate.getMonth()]}_${currentSelectedDate.getFullYear()}.csv`);
-                        link.style.visibility = 'hidden';
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
@@ -561,22 +567,40 @@
                                                 case 'monthly':
                                                     periodEnd = addMonths(periodEnd, 1);
                                                     periodEnd.setDate(periodEnd.getDate() - 1);
-                                                    paymentPeriodText = `untuk bulan ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(periodStart)}`;
+                                                    paymentPeriodText = `untuk bulan ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                }).format(periodStart)}`;
                                                     break;
                                                 case 'bimonthly': // Ditambahkan: Case untuk 2 bulanan
                                                     periodEnd = addMonths(periodEnd, 2);
                                                     periodEnd.setDate(periodEnd.getDate() - 1);
-                                                    paymentPeriodText = `untuk 2 bulanan ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(periodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(periodEnd)}`;
+                                                    paymentPeriodText = `untuk 2 bulanan ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long'
+                                }).format(periodStart)} - ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                }).format(periodEnd)}`;
                                                     break;
                                                 case 'quarterly':
                                                     periodEnd = addMonths(periodEnd, 3);
                                                     periodEnd.setDate(periodEnd.getDate() - 1);
-                                                    paymentPeriodText = `untuk triwulan ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(periodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(periodEnd)}`;
+                                                    paymentPeriodText = `untuk triwulan ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long'
+                                }).format(periodStart)} - ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                }).format(periodEnd)}`;
                                                     break;
                                                 case 'biannually':
                                                     periodEnd = addMonths(periodEnd, 6);
                                                     periodEnd.setDate(periodEnd.getDate() - 1);
-                                                    paymentPeriodText = `untuk semester ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(periodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(periodEnd)}`;
+                                                    paymentPeriodText = `untuk semester ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long'
+                                }).format(periodStart)} - ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                }).format(periodEnd)}`;
                                                     break;
                                                 case 'annually':
                                                     periodEnd = addMonths(periodEnd, 12);
@@ -587,15 +611,35 @@
                                         }
 
                                         if (tenant.status === 'overdue') {
-                                            waMessageBody = ` Pembayaran sewa kos Anda ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} telah melewati tanggal jatuh tempo ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)} dan terlambat ${Math.abs(tenant.diffDays)} hari. Mohon segera dilunasi untuk menghindari denda keterlambatan.`;
+                                            waMessageBody = ` Pembayaran sewa kos Anda ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} telah melewati tanggal jatuh tempo ${new Intl.DateTimeFormat('id-ID', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                        }).format(tenant.dueDate)} dan terlambat ${Math.abs(tenant.diffDays)} hari. Mohon segera dilunasi untuk menghindari denda keterlambatan.`;
                                         } else if (tenant.status === 'due_soon' && tenant.diffDays === 0) {
-                                            waMessageBody = ` Pembayaran sewa kos Anda ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} jatuh tempo HARI INI, ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}.%0AMohon segera dilunasi.`;
+                                            waMessageBody = ` Pembayaran sewa kos Anda ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} jatuh tempo HARI INI, ${new Intl.DateTimeFormat('id-ID', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                        }).format(tenant.dueDate)}.%0AMohon segera dilunasi.`;
                                         } else if (tenant.status === 'due_soon' && tenant.diffDays > 0) {
-                                            waMessageBody = ` Kami ingin mengingatkan bahwa pembayaran sewa kos ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} akan jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)} (dalam ${tenant.diffDays} hari). Mohon segera dilakukan pembayaran.`;
+                                            waMessageBody = ` Kami ingin mengingatkan bahwa pembayaran sewa kos ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} akan jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                        }).format(tenant.dueDate)} (dalam ${tenant.diffDays} hari). Mohon segera dilakukan pembayaran.`;
                                         } else if (tenant.status === 'first_month_unpaid') {
-                                            waMessageBody = ` Selamat datang di ${NAMA_KOS}! Pembayaran sewa kos Anda ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}. Mohon segera dilunasi.`;
+                                            waMessageBody = ` Selamat datang di ${NAMA_KOS}! Pembayaran sewa kos Anda ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                        }).format(tenant.dueDate)}. Mohon segera dilunasi.`;
                                         } else if (tenant.status === 'unpaid') {
-                                            waMessageBody = ` Pembayaran sewa kos Anda ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} belum lunas dan telah jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(tenant.dueDate)}. Mohon segera dilunasi.`;
+                                            waMessageBody = ` Pembayaran sewa kos Anda ${paymentPeriodText} sebesar ${formatCurrency(tenant.rent)} belum lunas dan telah jatuh tempo pada tanggal ${new Intl.DateTimeFormat('id-ID', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                        }).format(tenant.dueDate)}. Mohon segera dilunasi.`;
                                         }
 
 
@@ -857,16 +901,34 @@
 
                         switch (tenant.paymentInterval) {
                             case 'monthly':
-                                periodTextForModal = `Sewa Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodStart)})`;
+                                periodTextForModal = `Sewa Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                }).format(tempPeriodStart)})`;
                                 break;
                             case 'bimonthly': // Ditambahkan: Case untuk 2 bulanan
-                                periodTextForModal = `Sewa 2 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
+                                periodTextForModal = `Sewa 2 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long'
+                                }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                }).format(tempPeriodEnd)})`;
                                 break;
                             case 'quarterly':
-                                periodTextForModal = `Sewa 3 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
+                                periodTextForModal = `Sewa 3 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long'
+                                }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                }).format(tempPeriodEnd)})`;
                                 break;
                             case 'biannually':
-                                periodTextForModal = `Sewa 6 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(tempPeriodEnd)})`;
+                                periodTextForModal = `Sewa 6 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long'
+                                }).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                }).format(tempPeriodEnd)})`;
                                 break;
                             case 'annually':
                                 periodTextForModal = `Sewa Tahunan (Periode: Tahun ${tempPeriodStart.getFullYear()})`;
