@@ -48,17 +48,16 @@
 
         <div class="flex justify-end mb-6 gap-3">
             <button id="download-excel-btn" class="bg-green-600 text-white rounded-lg px-6 py-3 shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-        Download Data (Excel)
-      </button>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                Download Data (Excel)
+            </button>
             <button id="add-tenant-btn" class="bg-teal-600 text-white rounded-lg px-6 py-3 shadow-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-        Tambah Penyewa Baru
-      </button>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                Tambah Penyewa Baru
+            </button>
         </div>
 
         <main>
-            <!-- KARTU METRIK -->
             <section id="metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 gap-4 mb-6"></section>
 
             <div class="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
@@ -311,22 +310,6 @@
                         const months = intervalToMonths[tenant.paymentInterval] || 1;
                         return (tenant.rent || 0) / months;
                     };
-                    const monthsActiveInYear = (tenant, year) => {
-                        const entryY = tenant.entryDate.getFullYear();
-                        if (entryY > year) return 0;
-                        if (entryY < year) return 12;
-                        return 12 - tenant.entryDate.getMonth();
-                    };
-                    const monthsFromEntryToSelected = (tenant) => {
-                        const y = currentSelectedDate.getFullYear();
-                        const m = currentSelectedDate.getMonth();
-                        const endOfSelectedMonth = new Date(y, m + 1, 0, 23, 59, 59, 999);
-                        if (tenant.entryDate > endOfSelectedMonth) return 0;
-                        return (y - tenant.entryDate.getFullYear()) * 12 + (m - tenant.entryDate.getMonth()) + 1;
-                    };
-
-                    // ====== METRIK ======
-                    // ... (fungsi util lainnya tidak perlu diubah)
 
                     const renderMetricsCards = () => {
                         const cardsWrap = document.getElementById('metrics-cards');
@@ -573,39 +556,39 @@
                                         const waLink = (waMessageBody && tenant.phone) ? `https://wa.me/${tenant.phone}?text=${encodeURIComponent(waBaseText + waMessageBody + waClosing)}` : '';
 
                                         const row = `
-            <tr class="bg-white border-b border-stone-200 hover:bg-stone-50">
-              <td class="px-6 py-4 font-medium text-slate-900">${tenant.name}<div class="text-xs text-slate-500">Kamar ${tenant.room}</div></td>
-              <td class="px-6 py-4">${new Date(tenant.entryDate).toLocaleDateString('id-ID')}</td>
-              <td class="px-6 py-4">${rentPerMonthDisplay}</td>
-              <td class="px-6 py-4">${formatCurrency(tenant.deposit)}</td>
-              <td class="px-6 py-4">${paymentIntervalLabels[tenant.paymentInterval]}</td>
-              <td class="px-6 py-4">${dueDateDisplay}</td>
-              <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full ${tenant.statusColor}">${tenant.statusText}</span></td>
-              <td class="px-6 py-4 text-center flex items-center justify-center gap-2">
-                <button data-action="edit-tenant" data-id="${tenant.id}" class="text-blue-600 hover:text-blue-800 font-medium">Edit</button>
-                ${(!tenant.isPaid && tenant.status !== 'not_yet_entered') ? `
-                  <button data-action="log-payment" data-id="${tenant.id}" class="text-teal-600 hover:text-teal-800 font-medium">Bayar</button>
-                  ${waLink ? `<a href="${waLink}" target="_blank" class="text-amber-600 hover:text-amber-800 font-medium">WA</a>` : ''}` : ''}
-              </td>
-              <td class="px-6 py-4 text-center"><button data-action="delete-tenant" data-id="${tenant.id}" class="text-red-600 hover:text-red-800 font-medium">Hapus</button></td>
-            </tr>`;
-          tableBody.innerHTML += row;
-        });
-      };
+        <tr class="bg-white border-b border-stone-200 hover:bg-stone-50">
+          <td class="px-6 py-4 font-medium text-slate-900">${tenant.name}<div class="text-xs text-slate-500">Kamar ${tenant.room}</div></td>
+          <td class="px-6 py-4">${new Date(tenant.entryDate).toLocaleDateString('id-ID')}</td>
+          <td class="px-6 py-4">${rentPerMonthDisplay}</td>
+          <td class="px-6 py-4">${formatCurrency(tenant.deposit)}</td>
+          <td class="px-6 py-4">${paymentIntervalLabels[tenant.paymentInterval]}</td>
+          <td class="px-6 py-4">${dueDateDisplay}</td>
+          <td class="px-6 py-4"><span class="px-2 py-1 text-xs font-medium rounded-full ${tenant.statusColor}">${tenant.statusText}</span></td>
+          <td class="px-6 py-4 text-center flex items-center justify-center gap-2">
+            <button data-action="edit-tenant" data-id="${tenant.id}" class="text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+            ${(!tenant.isPaid && tenant.status !== 'not_yet_entered') ? `
+              <button data-action="log-payment" data-id="${tenant.id}" class="text-teal-600 hover:text-teal-800 font-medium">Bayar</button>
+              ${waLink ? `<a href="${waLink}" target="_blank" class="text-amber-600 hover:text-amber-800 font-medium">WA</a>` : ''}` : ''}
+          </td>
+          <td class="px-6 py-4 text-center"><button data-action="delete-tenant" data-id="${tenant.id}" class="text-red-600 hover:text-red-800 font-medium">Hapus</button></td>
+        </tr>`;
+                    tableBody.innerHTML += row;
+                });
+            };
 
-      // --- MODAL LENGKAP: TAMBAH/EDIT, BAYAR, HAPUS ---
-      const renderModal = (type, id = null) => {
-        const modalContainer = document.getElementById('modal-container');
-        let title = '', content = '';
-        const tenant = id ? tenants.find(t => t.id === id) : null;
+            // --- MODAL LENGKAP: TAMBAH/EDIT, BAYAR, HAPUS ---
+            const renderModal = (type, id = null) => {
+                const modalContainer = document.getElementById('modal-container');
+                let title = '', content = '';
+                const tenant = id ? tenants.find(t => t.id === id) : null;
 
-        if (type === 'addTenant' || type === 'editTenant') {
-          title = type === 'addTenant' ? "Tambah Penyewa Baru" : "Edit Data Penyewa";
-          const isEdit = type === 'editTenant';
-          const entryDateValue = isEdit && tenant.entryDate ? tenant.entryDate.toISOString().split('T')[0] : '';
-          const rentPerMonthValue = isEdit ? ((tenant.rent || 0) / (intervalToMonths[tenant.paymentInterval] || 1)) : '';
+                if (type === 'addTenant' || type === 'editTenant') {
+                    title = type === 'addTenant' ? "Tambah Penyewa Baru" : "Edit Data Penyewa";
+                    const isEdit = type === 'editTenant';
+                    const entryDateValue = isEdit && tenant.entryDate ? tenant.entryDate.toISOString().split('T')[0] : '';
+                    const rentPerMonthValue = isEdit ? ((tenant.rent || 0) / (intervalToMonths[tenant.paymentInterval] || 1)) : '';
 
-          content = `
+                    content = `
             <div class="space-y-4">
               <div>
                 <label for="name" class="block text-sm font-medium text-slate-700">Nama Lengkap</label>
@@ -651,35 +634,35 @@
               <button id="${isEdit ? 'update-tenant-btn' : 'save-tenant-btn'}" data-id="${isEdit ? tenant.id : ''}" class="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">${isEdit ? 'Update' : 'Simpan'}</button>
             </div>
           `;
-        } else if (type === 'logPayment' && tenant) {
-          const today = new Date();
-          const currentStatus = getTenantPaymentStatus(tenant, currentSelectedDate);
-          const dueDateForDisplay = currentStatus.dueDate;
-          let periodTextForModal = 'N/A';
-          let amountToPay = tenant.rent;
+                } else if (type === 'logPayment' && tenant) {
+                    const today = new Date();
+                    const currentStatus = getTenantPaymentStatus(tenant, currentSelectedDate);
+                    const dueDateForDisplay = currentStatus.dueDate;
+                    let periodTextForModal = 'N/A';
+                    let amountToPay = tenant.rent;
 
-          if (dueDateForDisplay) {
-            let tempPeriodStart = new Date(dueDateForDisplay);
-            let monthsInIntervalForPeriodText = intervalToMonths[tenant.paymentInterval];
-            let tempPeriodEnd = addMonths(tempPeriodStart, monthsInIntervalForPeriodText);
-            tempPeriodEnd.setDate(tempPeriodEnd.getDate() - 1);
+                    if (dueDateForDisplay) {
+                        let tempPeriodStart = new Date(dueDateForDisplay);
+                        let monthsInIntervalForPeriodText = intervalToMonths[tenant.paymentInterval];
+                        let tempPeriodEnd = addMonths(tempPeriodStart, monthsInIntervalForPeriodText);
+                        tempPeriodEnd.setDate(tempPeriodEnd.getDate() - 1);
 
-            switch (tenant.paymentInterval) {
-              case 'monthly':
-                periodTextForModal = `Sewa Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodStart)})`; break;
-              case 'bimonthly':
-                periodTextForModal = `Sewa 2 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID',{month:'long'}).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodEnd)})`; break;
-              case 'quarterly':
-                periodTextForModal = `Sewa 3 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID',{month:'long'}).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodEnd)})`; break;
-              case 'biannually':
-                periodTextForModal = `Sewa 6 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID',{month:'long'}).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodEnd)})`; break;
-              case 'annually':
-                periodTextForModal = `Sewa Tahunan (Periode: Tahun ${tempPeriodStart.getFullYear()})`; break;
-            }
-          }
+                        switch (tenant.paymentInterval) {
+                            case 'monthly':
+                                periodTextForModal = `Sewa Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodStart)})`; break;
+                            case 'bimonthly':
+                                periodTextForModal = `Sewa 2 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID',{month:'long'}).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodEnd)})`; break;
+                            case 'quarterly':
+                                periodTextForModal = `Sewa 3 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID',{month:'long'}).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodEnd)})`; break;
+                            case 'biannually':
+                                periodTextForModal = `Sewa 6 Bulanan (Periode: ${new Intl.DateTimeFormat('id-ID',{month:'long'}).format(tempPeriodStart)} - ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodEnd)})`; break;
+                            case 'annually':
+                                periodTextForModal = `Sewa Tahunan (Periode: Tahun ${tempPeriodStart.getFullYear()})`; break;
+                        }
+                    }
 
-          title = "Catat Pembayaran";
-          content = `
+                    title = "Catat Pembayaran";
+                    content = `
             <div class="space-y-4">
               <div>
                 <label for="payment_tenant_name" class="block text-sm font-medium text-slate-700">Penyewa</label>
@@ -703,9 +686,9 @@
               <button id="save-payment-btn" data-id="${tenant.id}" class="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">Simpan Pembayaran</button>
             </div>
           `;
-        } else if (type === 'confirmDelete' && tenant) {
-          title = "Konfirmasi Penghapusan";
-          content = `
+                } else if (type === 'confirmDelete' && tenant) {
+                    title = "Konfirmasi Penghapusan";
+                    content = `
             <p class="text-slate-700 mb-4">Anda yakin ingin menghapus penghuni <b>${tenant.name} (Kamar ${tenant.room})</b>?</p>
             <p class="text-sm text-red-600">Tindakan ini tidak dapat dibatalkan dan semua data pembayaran terkait juga akan terhapus.</p>
             <div class="mt-6 flex justify-end gap-3">
@@ -713,9 +696,9 @@
               <button id="confirm-delete-btn" data-id="${tenant.id}" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">Ya, Hapus</button>
             </div>
           `;
-        }
+                }
 
-        const modalHTML = `
+                const modalHTML = `
           <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-bg opacity-0">
             <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 modal-content transform scale-95">
               <div class="flex justify-between items-center mb-4">
@@ -726,174 +709,174 @@
             </div>
           </div>
         `;
-        modalContainer.innerHTML = modalHTML;
-        setTimeout(() => {
-          const modal = document.getElementById('modal');
-          modal.classList.remove('opacity-0');
-          modal.querySelector('.modal-content').classList.add('scale-95');
-        }, 10);
+                modalContainer.innerHTML = modalHTML;
+                setTimeout(() => {
+                    const modal = document.getElementById('modal');
+                    modal.classList.remove('opacity-0');
+                    modal.querySelector('.modal-content').classList.add('scale-95');
+                }, 10);
 
-        // default nilai saat tambah/edit
-        if (type === 'addTenant') {
-          document.getElementById('paymentInterval').value = 'monthly';
-          document.getElementById('entryDate').valueAsDate = new Date();
-        }
-      };
-
-      const closeModal = () => {
-        const modal = document.getElementById('modal');
-        if (modal) {
-          modal.classList.add('opacity-0');
-          modal.querySelector('.modal-content').classList.add('scale-95');
-          setTimeout(() => { document.getElementById('modal-container').innerHTML = ''; }, 300);
-        }
-      };
-
-      // --- EVENTS ---
-      const handleFilterClick = (e) => {
-        const btn = e.target.closest('.filter-btn'); if (!btn) return;
-        currentFilter = btn.dataset.filter;
-        document.querySelectorAll('.filter-btn').forEach(b => { b.classList.remove('bg-teal-600','text-white'); b.classList.add('bg-white','text-slate-700'); });
-        btn.classList.add('bg-teal-600','text-white'); btn.classList.remove('bg-white','text-slate-700');
-        renderTable(); renderMetricsCards();
-      };
-
-      const handleTableClick = (e) => {
-        const action = e.target.dataset.action;
-        const id = parseInt(e.target.dataset.id);
-        if (!action) return;
-        if (action === 'log-payment') { renderModal('logPayment', id); }
-        else if (action === 'edit-tenant') { renderModal('editTenant', id); }
-        else if (action === 'delete-tenant') { renderModal('confirmDelete', id); }
-      };
-
-      const handleModalAction = (e) => {
-        const action = e.target.dataset.action;
-        if (action === 'close-modal') { closeModal(); return; }
-
-        const btnId = e.target.id;
-
-        if (btnId === 'save-tenant-btn') {
-          const name = document.getElementById('name').value.trim();
-          const room = document.getElementById('room').value.trim();
-          const phone = document.getElementById('phone').value.trim();
-          const entryDateStr = document.getElementById('entryDate').value;
-          const rentPerMonthInput = parseFloat(document.getElementById('rent_per_month_input').value);
-          const deposit = parseFloat(document.getElementById('deposit').value) || 0;
-          const paymentInterval = document.getElementById('paymentInterval').value;
-          const rent = rentPerMonthInput * (intervalToMonths[paymentInterval] || 1);
-
-          if (name && room && phone && entryDateStr && !isNaN(rentPerMonthInput) && paymentInterval) {
-            const entryDate = new Date(entryDateStr); entryDate.setHours(0,0,0,0);
-            let monthsToAdvance = intervalToMonths[paymentInterval];
-            let initialLastPaidPeriodEnd = addMonths(new Date(entryDate), monthsToAdvance);
-            initialLastPaidPeriodEnd.setDate(initialLastPaidPeriodEnd.getDate()-1);
-            initialLastPaidPeriodEnd.setHours(23,59,59,999);
-
-            const newTenant = {
-              id: tenants.length > 0 ? Math.max(...tenants.map(t => t.id)) + 1 : 1,
-              name, room, phone, entryDate, rent, deposit, paymentInterval, lastPaidPeriodEnd: initialLastPaidPeriodEnd
+                // default nilai saat tambah/edit
+                if (type === 'addTenant') {
+                    document.getElementById('paymentInterval').value = 'monthly';
+                    document.getElementById('entryDate').valueAsDate = new Date();
+                }
             };
-            tenants.push(newTenant);
-            saveData(); updateAll(); closeModal();
-          } else {
-            alert("Harap isi semua kolom wajib (Nama, Kamar, No. WA, Tanggal Masuk, Harga/Bulan, Interval) dengan benar.");
-          }
-        } else if (btnId === 'update-tenant-btn') {
-          const tenantId = parseInt(e.target.dataset.id);
-          const tenantIndex = tenants.findIndex(t => t.id === tenantId);
-          if (tenantIndex === -1) { alert("Penyewa tidak ditemukan."); return; }
 
-          const name = document.getElementById('name').value.trim();
-          const room = document.getElementById('room').value.trim();
-          const phone = document.getElementById('phone').value.trim();
-          const entryDateStr = document.getElementById('entryDate').value;
-          const rentPerMonthInput = parseFloat(document.getElementById('rent_per_month_input').value);
-          const deposit = parseFloat(document.getElementById('deposit').value) || 0;
-          const paymentInterval = document.getElementById('paymentInterval').value;
-          const rent = rentPerMonthInput * (intervalToMonths[paymentInterval] || 1);
+            const closeModal = () => {
+                const modal = document.getElementById('modal');
+                if (modal) {
+                    modal.classList.add('opacity-0');
+                    modal.querySelector('.modal-content').classList.add('scale-95');
+                    setTimeout(() => { document.getElementById('modal-container').innerHTML = ''; }, 300);
+                }
+            };
 
-          if (name && room && phone && entryDateStr && !isNaN(rentPerMonthInput) && paymentInterval) {
-            const updatedEntryDate = new Date(entryDateStr); updatedEntryDate.setHours(0,0,0,0);
-            const oldEntryDate = tenants[tenantIndex].entryDate;
-            const oldPaymentInterval = tenants[tenantIndex].paymentInterval;
+            // --- EVENTS ---
+            const handleFilterClick = (e) => {
+                const btn = e.target.closest('.filter-btn'); if (!btn) return;
+                currentFilter = btn.dataset.filter;
+                document.querySelectorAll('.filter-btn').forEach(b => { b.classList.remove('bg-teal-600','text-white'); b.classList.add('bg-white','text-slate-700'); });
+                btn.classList.add('bg-teal-600','text-white'); btn.classList.remove('bg-white','text-slate-700');
+                renderTable(); renderMetricsCards();
+            };
 
-            tenants[tenantIndex].name = name;
-            tenants[tenantIndex].room = room;
-            tenants[tenantIndex].phone = phone;
-            tenants[tenantIndex].entryDate = updatedEntryDate;
-            tenants[tenantIndex].rent = rent;
-            tenants[tenantIndex].deposit = deposit;
-            tenants[tenantIndex].paymentInterval = paymentInterval;
+            const handleTableClick = (e) => {
+                const action = e.target.dataset.action;
+                const id = parseInt(e.target.dataset.id);
+                if (!action) return;
+                if (action === 'log-payment') { renderModal('logPayment', id); }
+                else if (action === 'edit-tenant') { renderModal('editTenant', id); }
+                else if (action === 'delete-tenant') { renderModal('confirmDelete', id); }
+            };
 
-            if (oldEntryDate.getTime() !== updatedEntryDate.getTime() || oldPaymentInterval !== paymentInterval) {
-              let monthsToAdvance = intervalToMonths[paymentInterval];
-              let newCalculatedLastPaidPeriodEnd = addMonths(new Date(updatedEntryDate), monthsToAdvance);
-              newCalculatedLastPaidPeriodEnd.setDate(newCalculatedLastPaidPeriodEnd.getDate()-1);
-              newCalculatedLastPaidPeriodEnd.setHours(23,59,59,999);
-              tenants[tenantIndex].lastPaidPeriodEnd = newCalculatedLastPaidPeriodEnd;
-            }
+            const handleModalAction = (e) => {
+                const action = e.target.dataset.action;
+                if (action === 'close-modal') { closeModal(); return; }
 
-            saveData(); updateAll(); closeModal();
-          } else {
-            alert("Harap isi semua kolom wajib dengan benar.");
-          }
-        } else if (btnId === 'save-payment-btn') {
-          const tenantId = parseInt(e.target.dataset.id);
-          const tenantIndex = tenants.findIndex(t => t.id === tenantId);
-          if (tenantIndex === -1) { alert("Penyewa tidak ditemukan."); return; }
-          const tenant = tenants[tenantIndex];
+                const btnId = e.target.id;
 
-          const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
-          const paymentDateStr = document.getElementById('payment_date').value;
-          const paymentDate = new Date(paymentDateStr); paymentDate.setHours(0,0,0,0);
+                if (btnId === 'save-tenant-btn') {
+                    const name = document.getElementById('name').value.trim();
+                    const room = document.getElementById('room').value.trim();
+                    const phone = document.getElementById('phone').value.trim();
+                    const entryDateStr = document.getElementById('entryDate').value;
+                    const rentPerMonthInput = parseFloat(document.getElementById('rent_per_month_input').value);
+                    const deposit = parseFloat(document.getElementById('deposit').value) || 0;
+                    const paymentInterval = document.getElementById('paymentInterval').value;
+                    const rent = rentPerMonthInput * (intervalToMonths[paymentInterval] || 1);
 
-          if (!isNaN(paymentAmount) && paymentDateStr) {
-            const monthsToAdvance = intervalToMonths[tenant.paymentInterval];
-            let lastPaidEnd = new Date(tenant.lastPaidPeriodEnd); lastPaidEnd.setHours(23,59,59,999);
-            let nextPeriodStart = new Date(lastPaidEnd); nextPeriodStart.setDate(nextPeriodStart.getDate()+1);
-            let newLastPaidPeriodEnd = addMonths(nextPeriodStart, monthsToAdvance);
-            newLastPaidPeriodEnd.setDate(newLastPaidPeriodEnd.getDate()-1); newLastPaidPeriodEnd.setHours(23,59,59,999);
+                    if (name && room && phone && entryDateStr && !isNaN(rentPerMonthInput) && paymentInterval) {
+                        const entryDate = new Date(entryDateStr); entryDate.setHours(0,0,0,0);
+                        let monthsToAdvance = intervalToMonths[paymentInterval];
+                        let initialLastPaidPeriodEnd = addMonths(new Date(entryDate), monthsToAdvance);
+                        initialLastPaidPeriodEnd.setDate(initialLastPaidPeriodEnd.getDate()-1);
+                        initialLastPaidPeriodEnd.setHours(23,59,59,999);
 
-            payments.push({ tenantId, periodEndCovered: newLastPaidPeriodEnd, amount: paymentAmount, date: paymentDate, paidForInterval: tenant.paymentInterval });
-            tenant.lastPaidPeriodEnd = newLastPaidPeriodEnd;
+                        const newTenant = {
+                            id: tenants.length > 0 ? Math.max(...tenants.map(t => t.id)) + 1 : 1,
+                            name, room, phone, entryDate, rent, deposit, paymentInterval, lastPaidPeriodEnd: initialLastPaidPeriodEnd
+                        };
+                        tenants.push(newTenant);
+                        saveData(); updateAll(); closeModal();
+                    } else {
+                        alert("Harap isi semua kolom wajib (Nama, Kamar, No. WA, Tanggal Masuk, Harga/Bulan, Interval) dengan benar.");
+                    }
+                } else if (btnId === 'update-tenant-btn') {
+                    const tenantId = parseInt(e.target.dataset.id);
+                    const tenantIndex = tenants.findIndex(t => t.id === tenantId);
+                    if (tenantIndex === -1) { alert("Penyewa tidak ditemukan."); return; }
 
-            saveData(); updateAll(); closeModal();
-          } else {
-            alert("Harap isi jumlah dan tanggal pembayaran dengan benar.");
-          }
-        } else if (btnId === 'confirm-delete-btn') {
-          const tenantToDeleteId = parseInt(e.target.dataset.id);
-          tenants = tenants.filter(t => t.id !== tenantToDeleteId);
-          payments = payments.filter(p => p.tenantId !== tenantToDeleteId);
-          saveData(); updateAll(); closeModal();
-        }
-      };
+                    const name = document.getElementById('name').value.trim();
+                    const room = document.getElementById('room').value.trim();
+                    const phone = document.getElementById('phone').value.trim();
+                    const entryDateStr = document.getElementById('entryDate').value;
+                    const rentPerMonthInput = parseFloat(document.getElementById('rent_per_month_input').value);
+                    const deposit = parseFloat(document.getElementById('deposit').value) || 0;
+                    const paymentInterval = document.getElementById('paymentInterval').value;
+                    const rent = rentPerMonthInput * (intervalToMonths[paymentInterval] || 1);
 
-      const handlePeriodFilter = () => {
-        const month = parseInt(document.getElementById('month-select').value);
-        const year = parseInt(document.getElementById('year-select').value);
-        currentSelectedDate = new Date(year, month, 1);
-        updateAll();
-      };
+                    if (name && room && phone && entryDateStr && !isNaN(rentPerMonthInput) && paymentInterval) {
+                        const updatedEntryDate = new Date(entryDateStr); updatedEntryDate.setHours(0,0,0,0);
+                        const oldEntryDate = tenants[tenantIndex].entryDate;
+                        const oldPaymentInterval = tenants[tenantIndex].paymentInterval;
 
-      // --- INIT ---
-      const updateAll = () => {
-        renderMetricsCards();
-        renderTable();
-      };
+                        tenants[tenantIndex].name = name;
+                        tenants[tenantIndex].room = room;
+                        tenants[tenantIndex].phone = phone;
+                        tenants[tenantIndex].entryDate = updatedEntryDate;
+                        tenants[tenantIndex].rent = rent;
+                        tenants[tenantIndex].deposit = deposit;
+                        tenants[tenantIndex].paymentInterval = paymentInterval;
 
-      loadData();
-      populateMonthYearSelectors();
-      document.getElementById('filters').addEventListener('click', handleFilterClick);
-      document.getElementById('tenant-table-body').addEventListener('click', handleTableClick);
-      document.getElementById('modal-container').addEventListener('click', handleModalAction);
-      document.getElementById('add-tenant-btn').addEventListener('click', () => renderModal('addTenant'));
-      document.getElementById('apply-period-filter').addEventListener('click', handlePeriodFilter);
-      document.getElementById('download-excel-btn').addEventListener('click', downloadExcel);
+                        if (oldEntryDate.getTime() !== updatedEntryDate.getTime() || oldPaymentInterval !== paymentInterval) {
+                            let monthsToAdvance = intervalToMonths[paymentInterval];
+                            let newCalculatedLastPaidPeriodEnd = addMonths(new Date(updatedEntryDate), monthsToAdvance);
+                            newCalculatedLastPaidPeriodEnd.setDate(newCalculatedLastPaidPeriodEnd.getDate()-1);
+                            newCalculatedLastPaidPeriodEnd.setHours(23,59,59,999);
+                            tenants[tenantIndex].lastPaidPeriodEnd = newCalculatedLastPaidPeriodEnd;
+                        }
 
-      updateAll();
-    });
+                        saveData(); updateAll(); closeModal();
+                    } else {
+                        alert("Harap isi semua kolom wajib dengan benar.");
+                    }
+                } else if (btnId === 'save-payment-btn') {
+                    const tenantId = parseInt(e.target.dataset.id);
+                    const tenantIndex = tenants.findIndex(t => t.id === tenantId);
+                    if (tenantIndex === -1) { alert("Penyewa tidak ditemukan."); return; }
+                    const tenant = tenants[tenantIndex];
+
+                    const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
+                    const paymentDateStr = document.getElementById('payment_date').value;
+                    const paymentDate = new Date(paymentDateStr); paymentDate.setHours(0,0,0,0);
+
+                    if (!isNaN(paymentAmount) && paymentDateStr) {
+                        const monthsToAdvance = intervalToMonths[tenant.paymentInterval];
+                        let lastPaidEnd = new Date(tenant.lastPaidPeriodEnd); lastPaidEnd.setHours(23,59,59,999);
+                        let nextPeriodStart = new Date(lastPaidEnd); nextPeriodStart.setDate(nextPeriodStart.getDate()+1);
+                        let newLastPaidPeriodEnd = addMonths(nextPeriodStart, monthsToAdvance);
+                        newLastPaidPeriodEnd.setDate(newLastPaidPeriodEnd.getDate()-1); newLastPaidPeriodEnd.setHours(23,59,59,999);
+
+                        payments.push({ tenantId, periodEndCovered: newLastPaidPeriodEnd, amount: paymentAmount, date: paymentDate, paidForInterval: tenant.paymentInterval });
+                        tenant.lastPaidPeriodEnd = newLastPaidPeriodEnd;
+
+                        saveData(); updateAll(); closeModal();
+                    } else {
+                        alert("Harap isi jumlah dan tanggal pembayaran dengan benar.");
+                    }
+                } else if (btnId === 'confirm-delete-btn') {
+                    const tenantToDeleteId = parseInt(e.target.dataset.id);
+                    tenants = tenants.filter(t => t.id !== tenantToDeleteId);
+                    payments = payments.filter(p => p.tenantId !== tenantToDeleteId);
+                    saveData(); updateAll(); closeModal();
+                }
+            };
+
+            const handlePeriodFilter = () => {
+                const month = parseInt(document.getElementById('month-select').value);
+                const year = parseInt(document.getElementById('year-select').value);
+                currentSelectedDate = new Date(year, month, 1);
+                updateAll();
+            };
+
+            // --- INIT ---
+            const updateAll = () => {
+                renderMetricsCards();
+                renderTable();
+            };
+
+            loadData();
+            populateMonthYearSelectors();
+            document.getElementById('filters').addEventListener('click', handleFilterClick);
+            document.getElementById('tenant-table-body').addEventListener('click', handleTableClick);
+            document.getElementById('modal-container').addEventListener('click', handleModalAction);
+            document.getElementById('add-tenant-btn').addEventListener('click', () => renderModal('addTenant'));
+            document.getElementById('apply-period-filter').addEventListener('click', handlePeriodFilter);
+            document.getElementById('download-excel-btn').addEventListener('click', downloadExcel);
+
+            updateAll();
+        });
     </script>
 </body>
 
