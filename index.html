@@ -209,11 +209,9 @@
                             }
                             tenant.deposit = tenant.deposit ? parseFloat(tenant.deposit) : 0;
                             tenant.paymentInterval = tenant.paymentInterval || 'monthly';
-                            // Tambahkan inisialisasi isActive
                             if (tenant.isActive === undefined) {
                                 tenant.isActive = true;
                             }
-                            // Tambahkan inisialisasi terminationDate
                             if (typeof tenant.terminationDate === 'string' && tenant.terminationDate !== "null") {
                                 tenant.terminationDate = new Date(tenant.terminationDate);
                                 tenant.terminationDate.setHours(23, 59, 59, 999);
@@ -277,7 +275,6 @@
                 return nextPeriodStartDate;
             };
 
-
             // STATUS / PERIODE
             const getTenantPaymentStatus = (tenant, selectedDate) => {
                 const targetMonth = selectedDate.getMonth();
@@ -292,20 +289,18 @@
                 const endOfSelectedMonth = new Date(targetYear, targetMonth + 1, 0);
                 endOfSelectedMonth.setHours(23, 59, 59, 999);
 
-                // 1. Cek jika penyewa sudah berhenti sebelum atau di akhir bulan yang dipilih
                 if (!tenant.isActive && tenant.terminationDate && tenant.terminationDate < startOfSelectedMonth) {
                     return {
                         ...tenant,
                         dueDate: null,
                         totalPaid: 0,
-                        isPaid: true, 
+                        isPaid: true,
                         status: 'inactive_terminated',
                         statusText: `Berhenti Sewa (${new Date(tenant.terminationDate).toLocaleDateString('id-ID')})`,
                         statusColor: 'bg-red-100 text-red-800',
                         diffDays: null
                     };
                 }
-
 
                 if (startOfSelectedMonth.getTime() < new Date(entryDate.getFullYear(), entryDate.getMonth(), 1).getTime()) {
                     return {
@@ -320,9 +315,8 @@
                     };
                 }
 
-                let calculatedDueDate = getExpectedDueDate(tenant); // = lastPaidPeriodEnd + 1 hari
+                let calculatedDueDate = getExpectedDueDate(tenant);
                 let tempPeriodsAdvanced = 0;
-                // --- Perbaikan: Logika pembayaran selanjutnya per bulan
                 let monthsToAdvance;
                 const isFirstPayment = tenant.lastPaidPeriodEnd.getTime() === calculateInitialLastPaidPeriodEnd(tenant.entryDate).getTime();
                 if (isFirstPayment) {
@@ -331,11 +325,8 @@
                     monthsToAdvance = 1;
                 }
 
-                // Cek jika penyewa sudah berhenti sewa (tapi di bulan yang sama/setelah berhenti)
                 if (!tenant.isActive && tenant.terminationDate && tenant.terminationDate >= startOfSelectedMonth) {
-                    // Cek jika pembayaran terakhir sudah mencakup bulan keluar
                     let isPaidForMonth = tenant.lastPaidPeriodEnd >= endOfSelectedMonth;
-                     // Jika sudah lunas atau periode sewa terakhir sudah dilunasi
                     if (isPaidForMonth) {
                         return {
                             ...tenant,
@@ -347,9 +338,7 @@
                             statusColor: 'bg-red-100 text-red-600',
                             diffDays: null
                         };
-                    } 
-                    // Jika belum lunas sampai bulan keluar
-                    else {
+                    } else {
                         return {
                             ...tenant,
                             dueDate: calculatedDueDate,
@@ -362,7 +351,6 @@
                         };
                     }
                 }
-
 
                 while (calculatedDueDate < startOfSelectedMonth && tempPeriodsAdvanced < 24) {
                     calculatedDueDate = addMonths(calculatedDueDate, monthsToAdvance);
@@ -424,18 +412,14 @@
                 startOfSelectedMonth.setHours(0, 0, 0, 0);
                 const endOfSelectedMonth = new Date(y, m + 1, 0, 23, 59, 59, 999);
 
-                // 1. Belum masuk di bulan ini
                 if (tenant.entryDate > endOfSelectedMonth) {
                     return false;
                 }
-                
-                // 2. Sudah keluar sebelum akhir bulan yang dipilih
-                // Kami menggunakan endOfMonth untuk tanggal keluar untuk mempermudah.
+
                 if (!tenant.isActive && tenant.terminationDate && tenant.terminationDate < endOfSelectedMonth) {
                     return false;
                 }
-                
-                // 3. Masih aktif atau baru masuk di bulan ini
+
                 return true;
             };
 
@@ -446,10 +430,9 @@
 
             const calculateMonthlyIncome = (selectedDate) => {
                 const paidTenants = tenants.filter(t => {
-                    // Hanya hitung yang aktif di bulan ini
-                    if (!isActiveInSelectedMonth(t, selectedDate)) return false; 
+                    if (!isActiveInSelectedMonth(t, selectedDate)) return false;
                     const status = getTenantPaymentStatus(t, selectedDate);
-                    return status.isPaid; // Hitung yang sudah lunas (termasuk yang non-aktif tapi sudah lunas di bulan keluar)
+                    return status.isPaid;
                 });
                 return paidTenants.reduce((sum, t) => sum + rentPerMonth(t), 0);
             };
@@ -478,10 +461,9 @@
                 const monthIdx = currentSelectedDate.getMonth();
                 const monthLabel = `${monthNames[monthIdx]} ${year}`;
 
-                // Kamar terisi: filter tenants berdasarkan isActiveInSelectedMonth
                 const occupiedTenants = tenants.filter(t => isActiveInSelectedMonth(t, currentSelectedDate));
                 const occupiedCount = occupiedTenants.length;
-                
+
                 const processedTenants = occupiedTenants.map(t => ({
                     t,
                     status: getTenantPaymentStatus(t, currentSelectedDate)
@@ -504,8 +486,6 @@
                 const overallIncome = calculateOverallIncome();
                 const overallExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
                 const overallNet = overallIncome - overallExpenses;
-
-                
 
                 const cards = [{
                     title: 'Pemasukan Bulan Ini',
@@ -658,26 +638,20 @@
                 const startOfSelectedMonth = new Date(currentSelectedDate.getFullYear(), currentSelectedDate.getMonth(), 1);
                 startOfSelectedMonth.setHours(0, 0, 0, 0);
 
-
                 if (currentFilter === 'inactive') {
-                    // Filter: Hanya yang tidak aktif (isActive = false)
                     filteredTenants = processedTenants.filter(t => !t.isActive);
                 } else {
-                    // Filter default/aktif: Hanya yang aktif di bulan ini
-                    // Menggunakan logika isActiveInSelectedMonth untuk Kamar Terisi (di bulan yang dipilih)
                     filteredTenants = processedTenants.filter(t => isActiveInSelectedMonth(t, currentSelectedDate));
-                    
-                    // Filter berdasarkan status
+
                     filteredTenants = filteredTenants.filter(t => {
                         if (t.status === 'not_yet_entered') return false;
                         if (currentFilter === 'all') return true;
                         if (currentFilter === 'paid') return t.isPaid;
                         if (currentFilter === 'unpaid') return !t.isPaid && (t.status === 'overdue' || t.status === 'unpaid' || t.status === 'due_soon' || t.status === 'first_month_unpaid' || t.status === 'inactive_unpaid');
                         if (currentFilter === 'due_soon') return !t.isPaid && t.status === 'due_soon';
-                        return true; 
+                        return true;
                     });
                 }
-
 
                 const statusOrder = {
                     'overdue': 1,
@@ -741,7 +715,7 @@
                             let tempPeriodStart = new Date(tenant.dueDate);
                             let tempPeriodEnd = addMonths(tempPeriodStart, intervalToMonths[tenant.paymentInterval]);
                             tempPeriodEnd.setDate(tempPeriodEnd.getDate() - 1);
-                            
+
                             switch (tenant.paymentInterval) {
                                 case 'monthly':
                                     paymentPeriodText = `untuk bulan ${new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(tempPeriodStart)}`;
@@ -773,14 +747,13 @@
                             <button data-action="terminate-tenant" data-id="${tenant.id}" class="text-red-500 hover:text-red-700 font-medium ml-2 text-xs py-1 px-2 rounded border border-red-500">Akhiri Sewa</button>
                         `;
                         deleteButton = `<button data-action="delete-tenant" data-id="${tenant.id}" class="text-red-600 hover:text-red-800 font-medium">Hapus</button>`;
-                    } else { // Tidak Aktif
+                    } else {
                          actionButtons = `
                             <button data-action="edit-tenant" data-id="${tenant.id}" class="text-blue-600 hover:text-blue-800 font-medium">Lihat/Edit</button>
                             <button data-action="reactivate-tenant" data-id="${tenant.id}" class="text-green-600 hover:text-green-800 font-medium ml-2 text-xs py-1 px-2 rounded border border-green-600">Aktifkan Lagi</button>
                          `;
                          deleteButton = `<button data-action="delete-tenant" data-id="${tenant.id}" class="text-red-600 hover:text-red-800 font-medium">Hapus</button>`;
                     }
-
 
                     const row = `
               <tr class="bg-white border-b border-stone-200 hover:bg-stone-50">
@@ -836,10 +809,10 @@
                 const expense = id ? expenses.find(e => e.id === id) : null;
 
                 if (type === 'addTenant' || type === 'editTenant') {
-                    title = type === 'addTenant' ? "Tambah Penyewa Baru" : "Edit Data Penyewa";
                     const isEdit = type === 'editTenant';
                     const entryDateValue = isEdit && tenant.entryDate ? tenant.entryDate.toISOString().split('T')[0] : '';
                     const rentPerMonthValue = isEdit ? ((tenant.rent || 0) / (intervalToMonths[tenant.paymentInterval] || 1)) : '';
+                    title = type === 'addTenant' ? "Tambah Penyewa Baru" : "Edit Data Penyewa";
 
                     content = `
                         <div class="space-y-4">
@@ -1019,7 +992,6 @@
                     `;
                 }
 
-
                 const modalHTML = `
                     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-bg opacity-0">
                         <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 modal-content transform scale-95">
@@ -1052,12 +1024,10 @@
                         const rentPerMonthValue = rentPerMonth(tenant);
                         let months = 0;
                         if (!isNaN(amount) && amount > 0 && rentPerMonthValue > 0) {
-                            // Jika pembayaran pertama, hitung berdasarkan interval
                             const isFirstPayment = tenant.lastPaidPeriodEnd.getTime() === calculateInitialLastPaidPeriodEnd(tenant.entryDate).getTime();
                             if (isFirstPayment) {
                                 months = amount / rentPerMonthValue;
                             } else {
-                                // Pembayaran selanjutnya diasumsikan 1 bulan
                                 months = 1;
                             }
                             const monthsText = months.toLocaleString('id-ID', {
@@ -1166,7 +1136,7 @@
                             deposit,
                             paymentInterval,
                             lastPaidPeriodEnd: calculateInitialLastPaidPeriodEnd(entryDate),
-                            isActive: true, // Default aktif
+                            isActive: true,
                             terminationDate: null
                         };
                         tenants.push(newTenant);
@@ -1197,7 +1167,6 @@
                         const updatedEntryDate = new Date(entryDateStr);
                         updatedEntryDate.setHours(0, 0, 0, 0);
 
-                        // Cek apakah entryDate berubah
                         const entryDateChanged = updatedEntryDate.getTime() !== tenants[tenantIndex].entryDate.getTime();
 
                         tenants[tenantIndex].name = name;
@@ -1208,11 +1177,10 @@
                         tenants[tenantIndex].deposit = deposit;
                         tenants[tenantIndex].paymentInterval = paymentInterval;
 
-                        // Reset lastPaidPeriodEnd jika tanggal masuk diubah
                         if (entryDateChanged) {
                              tenants[tenantIndex].lastPaidPeriodEnd = calculateInitialLastPaidPeriodEnd(updatedEntryDate);
                         }
-                       
+
                         saveData();
                         updateAll();
                         closeModal();
@@ -1243,14 +1211,21 @@
                             monthsToAdvance = 1;
                         }
 
-                        let newLastPaidPeriodEnd;
+                        // === FIX: Hitung periode mulai dari 1 hari SETELAH lastPaidPeriodEnd,
+                        // lalu maju N bulan, lalu mundur 1 hari untuk akhir periode ===
+                        let periodStart;
                         if (tenant.lastPaidPeriodEnd) {
-                            newLastPaidPeriodEnd = addMonths(tenant.lastPaidPeriodEnd, monthsToAdvance);
+                            periodStart = new Date(tenant.lastPaidPeriodEnd);
                         } else {
-                            newLastPaidPeriodEnd = addMonths(tenant.entryDate, monthsToAdvance);
-                            newLastPaidPeriodEnd.setDate(newLastPaidPeriodEnd.getDate() - 1);
-                            newLastPaidPeriodEnd.setHours(23, 59, 59, 999);
+                            periodStart = new Date(calculateInitialLastPaidPeriodEnd(tenant.entryDate));
                         }
+                        periodStart.setDate(periodStart.getDate() + 1);
+                        periodStart.setHours(0, 0, 0, 0);
+
+                        let newLastPaidPeriodEnd = addMonths(periodStart, monthsToAdvance);
+                        newLastPaidPeriodEnd.setDate(newLastPaidPeriodEnd.getDate() - 1);
+                        newLastPaidPeriodEnd.setHours(23, 59, 59, 999);
+                        // === END FIX ===
 
                         payments.push({
                             id: payments.length > 0 ? Math.max(...payments.map(p => p.id)) + 1 : 1,
@@ -1346,7 +1321,6 @@
                     closeModal();
                 }
             };
-
 
             const handlePeriodFilter = () => {
                 const month = parseInt(document.getElementById('month-select').value);
