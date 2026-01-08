@@ -1378,6 +1378,11 @@
                 }
 
                 const lastPayment = paymentsTenant[0];
+                const today = new Date();
+                today.setHours(23, 59, 59, 999);
+
+                const isLunas = tenant.lastPaidPeriodEnd >= today;
+                const statusText = isLunas ? "LUNAS" : "BELUM LUNAS";
 
                 const doc = new jsPDF({
                     unit: "mm",
@@ -1443,7 +1448,7 @@
                 // ===== STATUS =====
                 y += 7;
                 doc.setFont("courier", "bold");
-                doc.text("STATUS : LUNAS", 5, y);
+                doc.text(`STATUS : ${statusText}`, 5, y);
                 // ===== CAP LUNAS =====
                 // drawLunasStamp(doc, 50, y + 10); 
 
