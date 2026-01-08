@@ -1414,21 +1414,38 @@
                 doc.text("----------------------------------------", 40, y, { align: "center" });
 
                 // ===== DATA PEMBAYARAN =====
+                const monthsInterval = intervalToMonths[tenant.paymentInterval] || 1;
+                const hargaPerBulan = tenant.rent / monthsInterval;
+
                 y += 6;
                 doc.text(`Tanggal Bayar : ${lastPayment.date.toLocaleDateString('id-ID')}`, 5, y);
+
                 y += 5;
-                doc.text(`Jumlah        : ${formatCurrency(lastPayment.amount)}`, 5, y);
+                doc.text(`Jumlah Bayar  : ${formatCurrency(lastPayment.amount)}`, 5, y);
+
+                y += 5;
+                doc.text(`Harga / Bulan : ${formatCurrency(hargaPerBulan)}`, 5, y);
+
                 y += 5;
                 doc.text(
-                    `Periode s/d   : ${lastPayment.periodEndCovered.toLocaleDateString('id-ID')}`,
-                    5,
-                    y
+                `Interval      : ${paymentIntervalLabels[tenant.paymentInterval]}`,
+                5,
+                y
+                );
+
+                y += 5;
+                doc.text(
+                `Periode s/d   : ${lastPayment.periodEndCovered.toLocaleDateString('id-ID')}`,
+                5,
+                y
                 );
 
                 // ===== STATUS =====
                 y += 7;
                 doc.setFont("courier", "bold");
                 doc.text("STATUS : LUNAS", 5, y);
+                // ===== CAP LUNAS =====
+                // drawLunasStamp(doc, 50, y + 10); 
 
                 y += 8;
                 doc.setFont("courier", "normal");
