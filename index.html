@@ -1363,113 +1363,119 @@
 
             updateAll();
 
-            function generateNotaPDF(tenantId) {
-                const { jsPDF } = window.jspdf;
-                const tenant = tenants.find(t => t.id === tenantId);
-                if (!tenant) return;
+        function generateNotaPDF(tenantId) {
+            const jsPDF = window.jspdf.jsPDF;
 
-                const paymentsTenant = payments
-                    .filter(p => p.tenantId === tenantId)
-                    .sort((a, b) => b.date - a.date);
+            const tenant = tenants.find(t => t.id === tenantId);
+            if (!tenant) return;
 
-                if (paymentsTenant.length === 0) {
-                    alert("Belum ada pembayaran untuk penyewa ini.");
-                    return;
-                }
+            const paymentsTenant = payments
+                .filter(p => p.tenantId === tenantId)
+                .sort((a, b) => b.date - a.date);
 
-                const lastPayment = paymentsTenant[0];
-                const today = new Date();
-                today.setHours(23, 59, 59, 999);
-
-                const isLunas = tenant.lastPaidPeriodEnd >= today;
-                const statusText = isLunas ? "LUNAS" : "BELUM LUNAS";
-
-                const doc = new jsPDF({
-                    unit: "mm",
-                    format: [80, 150] // thermal 80mm
-                });
-
-                let y = 8;
-
-                // ===== JUDUL =====
-                doc.setFont("courier", "bold");
-                doc.setFontSize(10);
-                doc.text(
-                    "KWITANSI PEMBAYARAN\nKOST BAROKFI PUTRA & PUTRI",
-                    40,
-                    y,
-                    { align: "center" }
-                );
-
-                y += 10;
-
-                doc.setFontSize(9);
-                doc.setFont("courier", "normal");
-                doc.text("----------------------------------------", 40, y, { align: "center" });
-
-                // ===== DATA PENYEWA =====
-                y += 6;
-                doc.text(`Nama   : ${tenant.name}`, 5, y);
-                y += 5;
-                doc.text(`Kamar  : ${tenant.room}`, 5, y);
-                y += 5;
-                doc.text(`No WA  : ${tenant.phone}`, 5, y);
-
-                y += 6;
-                doc.text("----------------------------------------", 40, y, { align: "center" });
-
-                // ===== DATA PEMBAYARAN =====
-                const monthsInterval = intervalToMonths[tenant.paymentInterval] || 1;
-                const hargaPerBulan = tenant.rent / monthsInterval;
-
-                y += 6;
-                doc.text(`Tanggal Bayar : ${lastPayment.date.toLocaleDateString('id-ID')}`, 5, y);
-
-                y += 5;
-                doc.text(`Jumlah Bayar  : ${formatCurrency(lastPayment.amount)}`, 5, y);
-
-                y += 5;
-                doc.text(`Harga / Bulan : ${formatCurrency(hargaPerBulan)}`, 5, y);
-
-                y += 5;
-                doc.text(
-                `Interval      : ${paymentIntervalLabels[tenant.paymentInterval]}`,
-                5,
-                y
-                );
-
-                y += 5;
-                doc.text(
-                `Periode s/d   : ${lastPayment.periodEndCovered.toLocaleDateString('id-ID')}`,
-                5,
-                y
-                );
-
-                // ===== STATUS =====
-                y += 7;
-                doc.setFont("courier", "bold");
-                doc.text(`STATUS : ${statusText}`, 5, y);
-                // ===== CAP LUNAS =====
-                // drawLunasStamp(doc, 50, y + 10); 
-
-                y += 8;
-                doc.setFont("courier", "normal");
-                doc.text("----------------------------------------", 40, y, { align: "center" });
-
-                // ===== FOOTER =====
-                y += 6;
-                doc.text("Terima kasih atas pembayarannya", 40, y, { align: "center" });
-
-                // ===== TANDA TANGAN POJOK KANAN BAWAH =====
-                y += 12;
-                doc.setFontSize(8);
-                doc.text("Pemilik Kost", 75, y, { align: "right" });
-                y += 12;
-                doc.setFont("courier", "bold");
-                doc.text("Eko Prasetyo", 75, y, { align: "right" });
-
-                doc.save(`Nota_Kost_${tenant.name}_Kmr_${tenant.room}.pdf`);
+            if (paymentsTenant.length === 0) {
+                alert("Belum ada pembayaran untuk penyewa ini.");
+                return;
             }
+
+            const lastPayment = paymentsTenant[0];
+
+            // ===============================
+            // AMBIL LANGSUNG DARI KOLOM TABEL
+            // ===============================
+            const statusData = getTenantPaymentStatus(tenant, currentSelectedDate);
+
+            const jatuhTempoDate = statusData.dueDate;
+            const jatuhTempoText = jatuhTempoDate
+                ? new Intl.DateTimeFormat('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                }).format(jatuhTempoDate)
+                : '-';
+
+            // ===============================
+            // INTERVAL (TAMPIL SAJA)
+            // ===============================
+            const intervalText = paymentIntervalLabels[tenant.paymentInterval] || '-';
+
+            // ===============================
+            // STATUS (SAMA DENGAN TABEL)
+            // ===============================
+            const statusText = statusData.isPaid ? "LUNAS" : "BELUM LUNAS";
+
+            // ===============================
+            // PDF
+            // ===============================
+            const doc = new jsPDF({
+                unit: "mm",
+                format: [80, 140]
+            });
+
+            let y = 8;
+
+            doc.setFont("courier", "bold");
+            doc.setFontSize(10);
+            doc.text(
+                "KWITANSI PEMBAYARAN\nKOST BAROKFI PUTRA & PUTRI",
+                40,
+                y,
+                { align: "center" }
+            );
+
+            y += 10;
+            doc.setFontSize(9);
+            doc.setFont("courier", "normal");
+            doc.text("----------------------------------------", 40, y, { align: "center" });
+
+            // DATA PENYEWA
+            y += 6;
+            doc.text(`Nama   : ${tenant.name}`, 5, y);
+            y += 5;
+            doc.text(`Kamar  : ${tenant.room}`, 5, y);
+            y += 5;
+            doc.text(`No WA  : ${tenant.phone}`, 5, y);
+
+            y += 6;
+            doc.text("----------------------------------------", 40, y, { align: "center" });
+
+            // DATA PEMBAYARAN
+            const intervalMonths = intervalToMonths[tenant.paymentInterval] || 1;
+            const hargaPerBulan = tenant.rent / intervalMonths;
+
+            y += 6;
+            doc.text(`Tanggal Bayar : ${lastPayment.date.toLocaleDateString('id-ID')}`, 5, y);
+            y += 5;
+            doc.text(`Jumlah Bayar  : ${formatCurrency(lastPayment.amount)}`, 5, y);
+            y += 5;
+            doc.text(`Harga / Bulan : ${formatCurrency(hargaPerBulan)}`, 5, y);
+            y += 5;
+            doc.text(`Interval      : ${intervalText}`, 5, y);
+            y += 5;
+            doc.text(`Jatuh Tempo   : ${jatuhTempoText}`, 5, y);
+
+            // STATUS
+            y += 7;
+            doc.setFont("courier", "bold");
+            doc.text(`STATUS : ${statusText}`, 5, y);
+
+            y += 8;
+            doc.setFont("courier", "normal");
+            doc.text("----------------------------------------", 40, y, { align: "center" });
+
+            // FOOTER
+            y += 6;
+            doc.text("Terima kasih atas pembayarannya", 40, y, { align: "center" });
+
+            y += 10;
+            doc.setFontSize(8);
+            doc.text("Pemilik Kost", 75, y, { align: "right" });
+            y += 10;
+            doc.setFont("courier", "bold");
+            doc.text("Eko Prasetyo", 75, y, { align: "right" });
+
+            doc.save(`Nota_Kost_${tenant.name}_Kmr_${tenant.room}.pdf`);
+        }
 
             function drawLunasStamp(doc, x, y) {
             doc.saveGraphicsState();
