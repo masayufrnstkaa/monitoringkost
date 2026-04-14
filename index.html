@@ -107,6 +107,7 @@
                     <table class="w-full text-sm text-left text-slate-600">
                         <thead class="text-xs text-slate-700 uppercase bg-stone-50">
                             <tr>
+                                <th scope="col" class="px-6 py-3 text-center">No</th>
                                 <th scope="col" class="px-6 py-3">Penyewa</th>
                                 <th scope="col" class="px-6 py-3">Tanggal Masuk</th>
                                 <th scope="col" class="px-6 py-3">Harga per Bulan</th>
@@ -701,7 +702,7 @@
                     tableBody.classList.remove('hidden');
                 }
 
-                filteredTenants.forEach(tenant => {
+                filteredTenants.forEach((tenant, index) => {
                     let dueDateDisplay = '';
                     let actionButtons = '';
                     let deleteButton = '';
@@ -788,6 +789,8 @@
 
                     const row = `
               <tr class="bg-white border-b border-stone-200 hover:bg-stone-50">
+                <td class="px-6 py-4 text-center font-medium">${index + 1}</td>
+                <td class="px-6 py-4 font-medium text-slate-900">${tenant.name}</td>
                 <td class="px-6 py-4 font-medium text-slate-900">${tenant.name}<div class="text-xs text-slate-500">Kamar ${tenant.room}</div></td>
                 <td class="px-6 py-4">${new Date(tenant.entryDate).toLocaleDateString('id-ID')}</td>
                 <td class="px-6 py-4">${rentPerMonthDisplay}</td>
