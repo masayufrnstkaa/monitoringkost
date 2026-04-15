@@ -110,6 +110,7 @@
                                 <th scope="col" class="px-6 py-3 text-center">No</th>
                                 <th scope="col" class="px-6 py-3">Penyewa</th>
                                 <th scope="col" class="px-6 py-3">Tanggal Masuk</th>
+                                <th scope="col" class="px-6 py-3">Tanggal Lahir</th>
                                 <th scope="col" class="px-6 py-3">Harga per Bulan</th>
                                 <th scope="col" class="px-6 py-3">Deposit</th>
                                 <th scope="col" class="px-6 py-3">Interval</th>
@@ -222,6 +223,12 @@
                             } else if (tenant.lastPaidPeriodEnd === undefined) {
                                 tenant.lastPaidPeriodEnd = calculateInitialLastPaidPeriodEnd(tenant.entryDate);
                             }
+                            if (typeof tenant.birthDate === 'string' && tenant.birthDate) {
+                                tenant.birthDate = new Date(tenant.birthDate);
+                                tenant.birthDate.setHours(0, 0, 0, 0);
+                            } else {
+                                tenant.birthDate = null;
+                            }
                             tenant.deposit = tenant.deposit ? parseFloat(tenant.deposit) : 0;
                             tenant.paymentInterval = tenant.paymentInterval || 'monthly';
                             if (tenant.isActive === undefined) {
@@ -272,6 +279,19 @@
 
             // --- UTIL ---
             const formatCurrency = (amount) => `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(amount || 0))}`;
+            const parseLocalDate = (dateStr) => {
+                if (!dateStr || typeof dateStr !== 'string') return null;
+                const [year, month, day] = dateStr.split('-').map(Number);
+                return new Date(year, month - 1, day, 0, 0, 0, 0);
+            };
+            const formatDateForInput = (date) => {
+                if (!date) return '';
+                const d = new Date(date);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
             const addMonths = (date, months) => {
                 const d = new Date(date);
                 const originalDay = d.getDate();
@@ -288,6 +308,20 @@
                 nextPeriodStartDate.setDate(nextPeriodStartDate.getDate() + 1);
                 nextPeriodStartDate.setHours(0, 0, 0, 0);
                 return nextPeriodStartDate;
+            };
+            const isBirthdayToday = (birthDate) => {
+                if (!birthDate) return false;
+                const today = new Date();
+                return birthDate.getDate() === today.getDate() && birthDate.getMonth() === today.getMonth();
+            };
+            const formatBirthDateDisplay = (birthDate) => {
+                if (!birthDate) return '-';
+                const formatted = new Intl.DateTimeFormat('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                }).format(birthDate);
+                return isBirthdayToday(birthDate) ? `${formatted} 🎉` : formatted;
             };
 
             // STATUS / PERIODE
@@ -576,7 +610,7 @@
                 const dataPenyewa = [
                     ['Data Penyewa Kost'],
                     [''],
-                    ['Nama Penyewa', 'No. Kamar', 'No. WA', 'Tanggal Masuk', 'Harga Sewa (Rp / Interval)', 'Harga per Bulan (Rp)', 'Uang Deposit (Rp)', 'Interval Pembayaran', `Status Pembayaran (${monthNames[currentSelectedDate.getMonth()]} ${currentSelectedDate.getFullYear()})`, `Jatuh Tempo Pembayaran Berikutnya`, 'Tanggal Akhir Periode Terakhir Dibayar', 'Status Aktif', 'Tanggal Berhenti Sewa']
+                    ['Nama Penyewa', 'No. Kamar', 'No. WA', 'Tanggal Masuk', 'Tanggal Lahir', 'Harga Sewa (Rp / Interval)', 'Harga per Bulan (Rp)', 'Uang Deposit (Rp)', 'Interval Pembayaran', `Status Pembayaran (${monthNames[currentSelectedDate.getMonth()]} ${currentSelectedDate.getFullYear()})`, `Jatuh Tempo Pembayaran Berikutnya`, 'Tanggal Akhir Periode Terakhir Dibayar', 'Status Aktif', 'Tanggal Berhenti Sewa']
                 ];
                 tenants.sort((a, b) => parseInt(a.room) - parseInt(b.room)).forEach(tenant => {
                     const statusData = getTenantPaymentStatus(tenant, currentSelectedDate);
@@ -585,6 +619,7 @@
                     dataPenyewa.push([
                         tenant.name, tenant.room, `'${tenant.phone}`,
                         new Date(tenant.entryDate).toLocaleDateString('id-ID'),
+                        tenant.birthDate ? new Date(tenant.birthDate).toLocaleDateString('id-ID') : '-',
                         tenant.rent, Math.round(rentPerMonthVal),
                         tenant.deposit, paymentIntervalLabels[tenant.paymentInterval],
                         statusData.statusText,
@@ -790,9 +825,9 @@
                     const row = `
               <tr class="bg-white border-b border-stone-200 hover:bg-stone-50">
                 <td class="px-6 py-4 text-center font-medium">${index + 1}</td>
-                <td class="px-6 py-4 font-medium text-slate-900">${tenant.name}</td>
                 <td class="px-6 py-4 font-medium text-slate-900">${tenant.name}<div class="text-xs text-slate-500">Kamar ${tenant.room}</div></td>
                 <td class="px-6 py-4">${new Date(tenant.entryDate).toLocaleDateString('id-ID')}</td>
+                <td class="px-6 py-4">${formatBirthDateDisplay(tenant.birthDate)}</td>
                 <td class="px-6 py-4">${rentPerMonthDisplay}</td>
                 <td class="px-6 py-4">${formatCurrency(tenant.deposit)}</td>
                 <td class="px-6 py-4">${paymentIntervalLabels[tenant.paymentInterval]}</td>
@@ -844,7 +879,8 @@
 
                 if (type === 'addTenant' || type === 'editTenant') {
                     const isEdit = type === 'editTenant';
-                    const entryDateValue = isEdit && tenant.entryDate ? tenant.entryDate.toISOString().split('T')[0] : '';
+                    const entryDateValue = isEdit && tenant.entryDate ? formatDateForInput(tenant.entryDate) : '';
+                    const birthDateValue = isEdit && tenant.birthDate ? formatDateForInput(tenant.birthDate) : '';
                     const rentPerMonthValue = isEdit ? ((tenant.rent || 0) / (intervalToMonths[tenant.paymentInterval] || 1)) : '';
                     title = type === 'addTenant' ? "Tambah Penyewa Baru" : "Edit Data Penyewa";
 
@@ -870,9 +906,13 @@
                                     <input type="date" id="entryDate" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500" value="${entryDateValue}">
                                 </div>
                                 <div>
-                                    <label for="rent_per_month_input" class="block text-sm font-medium text-slate-700">Harga Sewa per Bulan (Rp)</label>
-                                    <input type="number" id="rent_per_month_input" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500" value="${rentPerMonthValue}">
+                                    <label for="birthDate" class="block text-sm font-medium text-slate-700">Tanggal Lahir</label>
+                                    <input type="date" id="birthDate" class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500" value="${birthDateValue}">
                                 </div>
+                            </div>
+                            <div>
+                                <label for="rent_per_month_input" class="block text-sm font-medium text-slate-700">Harga Sewa per Bulan (Rp)</label>
+                                <input type="number" id="rent_per_month_input" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500" value="${rentPerMonthValue}">
                             </div>
                             <div>
                                 <label for="paymentInterval" class="block text-sm font-medium text-slate-700">Interval Pembayaran</label>
@@ -919,7 +959,7 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <label for="payment_date" class="block text-sm font-medium text-slate-700">Tanggal Pembayaran</label>
-                                <input type="date" id="payment_date" value="${today.toISOString().split('T')[0]}" required class="mt-1 block px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
+                                <input type="date" id="payment_date" value="${formatDateForInput(today)}" required class="mt-1 block px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500">
                             </div>
                             <div class="mt-4">
                                 <label for="payment_amount" class="block text-sm font-medium text-slate-700">Jumlah Bayar (Rp)</label>
@@ -952,7 +992,7 @@
                     `;
                 } else if (type === 'confirmTerminate' && tenant) {
                     const today = new Date();
-                    const defaultTerminationDate = today.toISOString().split('T')[0];
+                    const defaultTerminationDate = formatDateForInput(today);
 
                     title = "Konfirmasi Akhiri Masa Sewa";
                     content = `
@@ -983,7 +1023,7 @@
                             </div>
                             <div>
                                 <label for="expense-date" class="block text-sm font-medium text-slate-700">Tanggal Pengeluaran</label>
-                                <input type="date" id="expense-date" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" value="${new Date().toISOString().split('T')[0]}">
+                                <input type="date" id="expense-date" required class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" value="${formatDateForInput(new Date())}">
                             </div>
                         </div>
                         <div class="mt-6 flex justify-end gap-3">
@@ -993,7 +1033,7 @@
                     `;
                 } else if (type === 'editExpense' && expense) {
                     title = "Edit Pengeluaran";
-                    const dateValue = expense.date.toISOString().split('T')[0];
+                    const dateValue = formatDateForInput(expense.date);
                     content = `
                         <div class="space-y-4">
                             <div>
@@ -1046,7 +1086,7 @@
 
                 if (type === 'addTenant') {
                     document.getElementById('paymentInterval').value = 'monthly';
-                    document.getElementById('entryDate').valueAsDate = new Date();
+                    document.getElementById('entryDate').value = formatDateForInput(new Date());
                 }
 
                 if (type === 'logPayment' && tenant) {
@@ -1087,6 +1127,19 @@
                     setTimeout(() => {
                         document.getElementById('modal-container').innerHTML = '';
                     }, 300);
+                }
+            };
+
+            const showBirthdayAlerts = () => {
+                const todayKey = new Date().toLocaleDateString('sv-SE');
+                const alertKey = `birthdayAlertShown_${todayKey}`;
+                if (sessionStorage.getItem(alertKey)) return;
+
+                const birthdayTenants = tenants.filter(t => t.isActive && t.birthDate && isBirthdayToday(t.birthDate));
+                if (birthdayTenants.length > 0) {
+                    const names = birthdayTenants.map(t => `${t.name} (Kamar ${t.room})`).join(', ');
+                    alert(`🎉 Hari ini ada yang ulang tahun: ${names}`);
+                    sessionStorage.setItem(alertKey, 'true');
                 }
             };
 
@@ -1153,13 +1206,15 @@
                     const room = document.getElementById('room').value.trim();
                     const phone = document.getElementById('phone').value.trim();
                     const entryDateStr = document.getElementById('entryDate').value;
+                    const birthDateStr = document.getElementById('birthDate').value;
                     const rentPerMonthInput = parseFloat(document.getElementById('rent_per_month_input').value);
                     const deposit = parseFloat(document.getElementById('deposit').value) || 0;
                     const paymentInterval = document.getElementById('paymentInterval').value;
                     const rent = rentPerMonthInput * (intervalToMonths[paymentInterval] || 1);
 
                     if (name && room && phone && entryDateStr && !isNaN(rentPerMonthInput) && paymentInterval) {
-                        const entryDate = new Date(entryDateStr);
+                        const entryDate = parseLocalDate(entryDateStr);
+                        const birthDate = birthDateStr ? parseLocalDate(birthDateStr) : null;
                         entryDate.setHours(0, 0, 0, 0);
 
                         const newTenant = {
@@ -1168,6 +1223,7 @@
                             room,
                             phone,
                             entryDate,
+                            birthDate,
                             rent,
                             deposit,
                             paymentInterval,
@@ -1194,13 +1250,15 @@
                     const room = document.getElementById('room').value.trim();
                     const phone = document.getElementById('phone').value.trim();
                     const entryDateStr = document.getElementById('entryDate').value;
+                    const birthDateStr = document.getElementById('birthDate').value;
                     const rentPerMonthInput = parseFloat(document.getElementById('rent_per_month_input').value);
                     const deposit = parseFloat(document.getElementById('deposit').value) || 0;
                     const paymentInterval = document.getElementById('paymentInterval').value;
                     const rent = rentPerMonthInput * (intervalToMonths[paymentInterval] || 1);
 
                     if (name && room && phone && entryDateStr && !isNaN(rentPerMonthInput) && paymentInterval) {
-                        const updatedEntryDate = new Date(entryDateStr);
+                        const updatedEntryDate = parseLocalDate(entryDateStr);
+                        const updatedBirthDate = birthDateStr ? parseLocalDate(birthDateStr) : null;
                         updatedEntryDate.setHours(0, 0, 0, 0);
 
                         const entryDateChanged = updatedEntryDate.getTime() !== tenants[tenantIndex].entryDate.getTime();
@@ -1209,6 +1267,7 @@
                         tenants[tenantIndex].room = room;
                         tenants[tenantIndex].phone = phone;
                         tenants[tenantIndex].entryDate = updatedEntryDate;
+                        tenants[tenantIndex].birthDate = updatedBirthDate;
                         tenants[tenantIndex].rent = rent;
                         tenants[tenantIndex].deposit = deposit;
                         tenants[tenantIndex].paymentInterval = paymentInterval;
@@ -1234,7 +1293,7 @@
 
                     const paymentAmount = parseFloat(document.getElementById('payment_amount').value);
                     const paymentDateStr = document.getElementById('payment_date').value;
-                    const paymentDate = new Date(paymentDateStr);
+                    const paymentDate = parseLocalDate(paymentDateStr);
                     paymentDate.setHours(0, 0, 0, 0);
 
                     if (!isNaN(paymentAmount) && paymentDateStr) {
@@ -1247,8 +1306,6 @@
                             monthsToAdvance = 1;
                         }
 
-                        // === FIX: Hitung periode mulai dari 1 hari SETELAH lastPaidPeriodEnd,
-                        // lalu maju N bulan, lalu mundur 1 hari untuk akhir periode ===
                         let periodStart;
                         if (tenant.lastPaidPeriodEnd) {
                             periodStart = new Date(tenant.lastPaidPeriodEnd);
@@ -1261,7 +1318,6 @@
                         let newLastPaidPeriodEnd = addMonths(periodStart, monthsToAdvance);
                         newLastPaidPeriodEnd.setDate(newLastPaidPeriodEnd.getDate() - 1);
                         newLastPaidPeriodEnd.setHours(23, 59, 59, 999);
-                        // === END FIX ===
 
                         payments.push({
                             id: payments.length > 0 ? Math.max(...payments.map(p => p.id)) + 1 : 1,
@@ -1292,7 +1348,7 @@
                     const terminationDateStr = document.getElementById('terminationDate').value;
 
                     if (tenantIndex !== -1 && terminationDateStr) {
-                        const terminationDate = new Date(terminationDateStr);
+                        const terminationDate = parseLocalDate(terminationDateStr);
                         terminationDate.setHours(23, 59, 59, 999);
 
                         tenants[tenantIndex].isActive = false;
@@ -1307,7 +1363,7 @@
                     const description = document.getElementById('expense-description').value.trim();
                     const amount = parseFloat(document.getElementById('expense-amount').value);
                     const dateStr = document.getElementById('expense-date').value;
-                    const date = new Date(dateStr);
+                    const date = parseLocalDate(dateStr);
                     date.setHours(0, 0, 0, 0);
 
                     if (description && !isNaN(amount) && amount > 0 && dateStr) {
@@ -1335,7 +1391,7 @@
                     const description = document.getElementById('expense-description').value.trim();
                     const amount = parseFloat(document.getElementById('expense-amount').value);
                     const dateStr = document.getElementById('expense-date').value;
-                    const date = new Date(dateStr);
+                    const date = parseLocalDate(dateStr);
                     date.setHours(0, 0, 0, 0);
 
                     if (description && !isNaN(amount) && amount > 0 && dateStr) {
@@ -1389,6 +1445,7 @@
             });
 
             updateAll();
+            showBirthdayAlerts();
 
         function generateNotaPDF(tenantId) {
             const jsPDF = window.jspdf.jsPDF;
@@ -1407,9 +1464,6 @@
 
             const lastPayment = paymentsTenant[0];
 
-            // ===============================
-            // AMBIL LANGSUNG DARI KOLOM TABEL
-            // ===============================
             const statusData = getTenantPaymentStatus(tenant, currentSelectedDate);
 
             const jatuhTempoDate = statusData.dueDate;
@@ -1421,19 +1475,10 @@
                 }).format(jatuhTempoDate)
                 : '-';
 
-            // ===============================
-            // INTERVAL (TAMPIL SAJA)
-            // ===============================
             const intervalText = paymentIntervalLabels[tenant.paymentInterval] || '-';
 
-            // ===============================
-            // STATUS (SAMA DENGAN TABEL)
-            // ===============================
             const statusText = statusData.isPaid ? "LUNAS" : "BELUM LUNAS";
 
-            // ===============================
-            // PDF
-            // ===============================
             const doc = new jsPDF({
                 unit: "mm",
                 format: [80, 140]
@@ -1455,7 +1500,6 @@
             doc.setFont("courier", "normal");
             doc.text("----------------------------------------", 40, y, { align: "center" });
 
-            // DATA PENYEWA
             y += 6;
             doc.text(`Nama   : ${tenant.name}`, 5, y);
             y += 5;
@@ -1466,7 +1510,6 @@
             y += 6;
             doc.text("----------------------------------------", 40, y, { align: "center" });
 
-            // DATA PEMBAYARAN
             const intervalMonths = intervalToMonths[tenant.paymentInterval] || 1;
             const hargaPerBulan = tenant.rent / intervalMonths;
 
@@ -1481,7 +1524,6 @@
             y += 5;
             doc.text(`Jatuh Tempo   : ${jatuhTempoText}`, 5, y);
 
-            // STATUS
             y += 7;
             doc.setFont("courier", "bold");
             doc.text(`STATUS : ${statusText}`, 5, y);
@@ -1490,7 +1532,6 @@
             doc.setFont("courier", "normal");
             doc.text("----------------------------------------", 40, y, { align: "center" });
 
-            // FOOTER
             y += 6;
             doc.text("Terima kasih atas pembayarannya", 40, y, { align: "center" });
 
@@ -1507,25 +1548,20 @@
             function drawLunasStamp(doc, x, y) {
             doc.saveGraphicsState();
 
-            // Warna merah cap
             doc.setTextColor(200, 0, 0);
             doc.setDrawColor(200, 0, 0);
             doc.setLineWidth(0.8);
 
-            // Rotasi cap
             doc.rotate(-20, { origin: [x, y] });
 
-            // Kotak cap
             doc.rect(x - 18, y - 6, 36, 12);
 
-            // Teks LUNAS
             doc.setFont("courier", "bold");
             doc.setFontSize(14);
             doc.text("LUNAS", x, y + 4, { align: "center" });
 
             doc.restoreGraphicsState();
 
-            // Reset warna
             doc.setTextColor(0, 0, 0);
         }
         });
